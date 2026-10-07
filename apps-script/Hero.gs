@@ -30,7 +30,7 @@ function heroHtml_(appUrl) {
     h += '<div class="card rek"><div class="rek-head"><p class="rek-bank">' + esc_(rek.bank) + '</p><span class="small muted">rekening kas</span></div>' +
       '<div class="rek-no" id="rek-no">' + esc_(rek.tampil) + '</div>' +
       (rek.nama ? '<div class="small">a.n. ' + esc_(rek.nama) + '</div>' : '') +
-      '<button class="btn" type="button" data-copy="' + esc_(rek.nomor) + '" style="margin-top:10px">Salin nomor rekening</button></div>';
+      '<button class="btn cta" type="button" data-copy="' + esc_(rek.nomor) + '" style="margin-top:10px">Salin nomor rekening</button></div>';
   }
   h += '<a class="btn-ghost-link" href="' + esc_(appUrl) + '?tab=ringkasan" data-goto="ringkasan">Lihat laporan kas →</a></div></div>';
   return h;

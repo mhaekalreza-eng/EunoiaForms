@@ -245,6 +245,21 @@ a.btn { text-decoration: none; }
 .rek-no { font: 800 30px/1.1 var(--font-display); letter-spacing: .02em; margin: 2px 0; user-select: all; -webkit-user-select: all; font-variant-numeric: tabular-nums; }
 .rek .btn { min-height: 40px; padding: 8px 14px; }
 
+/* tombol salin rekening: denyut, kilau, percikan saat hover */
+.btn.cta { position: relative; overflow: hidden; animation: pulse 2.8s ease-in-out infinite; }
+.btn.cta::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.45), transparent);
+  transform: skewX(-18deg) translateX(0); animation: shine 4.2s ease-in-out infinite;
+}
+.btn.cta::after {
+  content: "✦"; position: absolute; right: 8px; top: 3px; font-size: 13px; color: var(--lime); pointer-events: none;
+  opacity: 0; transform: scale(.4) rotate(-30deg); transition: opacity .25s, transform .35s;
+}
+.btn.cta:hover::after, .btn.cta:focus-visible::after { opacity: 1; transform: scale(1) rotate(0); }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 50% { box-shadow: 0 0 0 8px transparent; } }
+@keyframes shine { 0%, 60% { transform: skewX(-18deg) translateX(0); } 100% { transform: skewX(-18deg) translateX(420%); } }
+
 /* kartu yang bisa disentuh: terangkat saat hover */
 .lift { transition: transform .2s ease, box-shadow .2s ease; }
 .lift:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
