@@ -9,8 +9,7 @@ function doGet() {
   t.namaKas = getSettings_().NAMA_KAS || 'Kas Eunoia';
   return t.evaluate()
     .setTitle(t.namaKas)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-    .setFaviconUrl('https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/account_balance_wallet/default/48px.svg');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
 function include(name) { return HtmlService.createHtmlOutputFromFile(name).getContent(); }
