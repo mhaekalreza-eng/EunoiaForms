@@ -29,7 +29,7 @@ function page() {
     .replace(/<\?!= include\('Css'\); \?>/, read('Css.html'))
     .replace(/<\?!= include\('App'\); \?>/, shim + read('App.html'))
     .replace(/<\?= namaKas \?>/g, nama)
-    .replace(/https:\/\/cdnjs[^"]+chart\.umd\.min\.js/, vendor ? '/chart.js' : '$&');
+    .replace(/https:\/\/cdnjs[^'"]+?chart\.umd\.min\.js/, vendor ? '/chart.js' : '$&');
 }
 const vendor = process.env.CHART_JS; // salinan Chart.js lokal (opsional, untuk preview offline)
 http.createServer((req, res) => {

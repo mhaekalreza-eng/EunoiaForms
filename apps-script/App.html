@@ -614,6 +614,21 @@ function adminAtur() {
 }
 
 // ---------- mulai ----------
+// Chart.js dimuat async: kalau CDN lambat/diblokir, dashboard tetap jalan tanpa grafik.
+function loadChartJs() {
+  const srcs = ['https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+    'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'];
+  (function next(i) {
+    if (i >= srcs.length) return;
+    const el = document.createElement('script');
+    el.src = srcs[i]; el.async = true;
+    el.onload = () => { if (S.pub) renderRingkasan(); };
+    el.onerror = () => next(i + 1);
+    document.head.appendChild(el);
+  })(0);
+}
+loadChartJs();
+
 // google.script.run kadang diam tanpa error kalau browser login ke beberapa akun Google sekaligus.
 setTimeout(() => {
   if (S.pub) return;
