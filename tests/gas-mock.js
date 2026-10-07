@@ -93,7 +93,7 @@ function createGas(opts = {}) {
   }
   vm.createContext(ctx);
   const dir = path.join(__dirname, '..', 'apps-script');
-  for (const f of ['Engine.js', 'Db.js', 'Setup.js', 'Import.js', 'Api.js', 'Reports.js']) {
+  for (const f of ['Engine.gs', 'Db.gs', 'Setup.gs', 'Import.gs', 'Api.gs', 'Reports.gs']) {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
   }
   ctx.__sheets = sheets; ctx.__sent = sent; ctx.__props = props;

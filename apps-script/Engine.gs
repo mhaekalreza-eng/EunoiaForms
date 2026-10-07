@@ -2,7 +2,7 @@
  * Kas Eunoia — mesin klasifikasi, matching, dan alokasi.
  *
  * Fungsi murni: tidak menyentuh SpreadsheetApp, supaya bisa dites di Node
- * (lihat tests/engine.test.js). Semua hasil dihitung ulang dari data mentah
+ * (lihat tests/server.test.js). Semua hasil dihitung ulang dari data mentah
  * setiap kali, jadi tidak ada state tersembunyi yang bisa "nyangkut".
  */
 

@@ -26,7 +26,7 @@ Sistem kas perumahan berbasis Google Sheets + Apps Script web app. Bahasa Indone
 | `Hasil`, `Matriks` | tampilan hasil hitung untuk dibaca langsung di Sheets (ditulis ulang otomatis) | Script |
 | `Log` | audit trail | Script |
 
-Alokasi bulan, kredit, utang ke bendahara, dan status klaim **tidak disimpan**: semuanya dihitung ulang dari tab di atas setiap kali dashboard dibuka (`Engine.js`), jadi tidak ada angka yang bisa basi.
+Alokasi bulan, kredit, utang ke bendahara, dan status klaim **tidak disimpan**: semuanya dihitung ulang dari tab di atas setiap kali dashboard dibuka (`Engine.gs`), jadi tidak ada angka yang bisa basi.
 
 ## 3. Jalur Data Masuk
 

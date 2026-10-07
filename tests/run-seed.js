@@ -1,5 +1,5 @@
 // Jalankan engine dengan seed privat (private/seed-kas-eunoia.json) dan cetak ringkasan.
-const { computeKas, labelBulan } = require('../apps-script/Engine.js');
+const { computeKas, labelBulan } = require('../apps-script/Engine.gs');
 const seed = require('../private/seed-kas-eunoia.json');
 const mutasi = [], saldo = [];
 for (const s of seed.statements) {

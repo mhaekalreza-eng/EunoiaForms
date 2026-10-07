@@ -15,12 +15,12 @@ Spesifikasi lengkap: [`SPEC.md`](SPEC.md).
 
 ```
 apps-script/       kode yang dipasang ke Apps Script
-  Engine.js        logika matching & alokasi (fungsi murni, dites di Node)
-  Db.js            baca/tulis tab spreadsheet
-  Setup.js         menu, setup, PIN, trigger, import data lama
-  Import.js        import mutasi (Claude API / JSON / doPost)
-  Api.js           web app & fungsi yang dipanggil dari browser
-  Reports.js       laporan WA/PDF & reminder
+  Engine.gs        logika matching & alokasi (fungsi murni, dites di Node)
+  Db.gs            baca/tulis tab spreadsheet
+  Setup.gs         menu, setup, PIN, trigger, import data lama
+  Import.gs        import mutasi (Claude API / JSON / doPost)
+  Api.gs           web app & fungsi yang dipanggil dari browser
+  Reports.gs       laporan WA/PDF & reminder
   Index.html, Css.html, App.html   tampilan web app
   appsscript.json  manifest
 tools/parse_bca.py parser PDF e-Statement BCA → JSON import (butuh pdftotext)
@@ -31,7 +31,7 @@ tests/             mock Apps Script + tes server + preview UI lokal
 
 1. Buat **Google Spreadsheet baru**, beri nama "Kas Eunoia".
 2. Buka **Extensions → Apps Script**.
-3. Untuk setiap file `.js` di `apps-script/`: klik **+ → Script**, beri nama sama tanpa ekstensi (mis. `Engine`), lalu tempel isinya. File `Code.gs` bawaan boleh dihapus.
+3. Untuk setiap file `.gs` di `apps-script/`: klik **+ → Script**, beri nama sama tanpa ekstensi (mis. `Engine`; editor otomatis menambah `.gs`), lalu tempel isinya. File `Code.gs` bawaan boleh dihapus.
 4. Untuk setiap file `.html`: klik **+ → HTML**, beri nama `Index`, `Css`, dan `App`, lalu tempel isinya.
 5. Buka **Project Settings → centang "Show appsscript.json"**, lalu ganti isi `appsscript.json` dengan file dari repo.
 6. Kembali ke spreadsheet dan refresh. Menu **Kas Eunoia** akan muncul.
