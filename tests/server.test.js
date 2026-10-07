@@ -84,3 +84,14 @@ assert.throws(() => g.apiAdmin('bukan-token'), /Sesi bendahara habis/);
 
 console.log('Semua tes server lulus ✓');
 module.exports = { g, token };
+
+// Import ulang tidak menghapus nomor WA / alias rekening yang diisi lewat Pengaturan.
+{
+  const kavX = seed.rumah[0].kavling;
+  g.apiSimpanRumah(token, { kavling: kavX, nama: seed.rumah[0].nama, rekening: 'ALIAS BARU', wa: '08123456789' });
+  g.commitImport_({ rumah: seed.rumah, statements: [] }, 'tes');
+  const r = g.readTable_('Rumah').find(x => x.kavling === kavX);
+  assert.strictEqual(String(r.wa), '628123456789');
+  assert(String(r.rekening).includes('ALIAS BARU'));
+  console.log('Import ulang mempertahankan WA & alias ✓');
+}

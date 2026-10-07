@@ -145,8 +145,15 @@ function commitImport_(payload, sumber) {
       if (k === 'PIN_HASH' || k === 'PIN_SALT') return;
       setSetting_(k, payload.settings[k]);
     });
+    // Data rumah digabung, bukan ditimpa: nama rekening ditambahkan, nomor WA yang sudah diisi dipertahankan.
+    var rumahLama = {};
+    readTable_('Rumah').forEach(function (r) { rumahLama[r.kavling] = r; });
     (payload.rumah || []).forEach(function (r) {
-      upsert_('Rumah', 'kavling', { kavling: r.kavling, nama: r.nama, rekening: r.rekening || [], wa: r.wa || '', aktif: r.aktif === false ? 'FALSE' : 'TRUE' });
+      var lama = rumahLama[r.kavling] || {};
+      var rek = splitList_(lama.rekening, ';');
+      (r.rekening || []).forEach(function (a) { if (rek.indexOf(a) < 0) rek.push(a); });
+      upsert_('Rumah', 'kavling', { kavling: r.kavling, nama: r.nama || lama.nama, rekening: rek, wa: r.wa || lama.wa || '',
+        aktif: r.aktif === false ? 'FALSE' : (lama.aktif || 'TRUE') });
     });
     if (payload.tarif) replaceTable_('Tarif', payload.tarif);
     (payload.expected || []).forEach(function (e) { e.aktif = e.aktif === false ? 'FALSE' : 'TRUE'; upsert_('Expected', 'id', e); });
