@@ -24,7 +24,21 @@ function doGet(e) {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-function include(name) { return HtmlService.createHtmlOutputFromFile(name).getContent(); }
+/**
+ * Sisipkan file HTML ke template. Script inline besar dikirim sebagai base64 lalu dijalankan
+ * di browser, karena HtmlService terbukti memotong/merusak script panjang (browser hanya
+ * menerima ±36 rb dari 51 rb karakter → "Unexpected end of input").
+ */
+function include(name) {
+  var raw = HtmlService.createTemplateFromFile(name).getRawContent();
+  var m = raw.match(/^\s*<script>([\s\S]*)<\/script>\s*$/);
+  if (!m) return raw;
+  var b64 = Utilities.base64Encode(m[1], Utilities.Charset.UTF_8);
+  return '<script>(function () { var bin = atob("' + b64 + '"); ' +
+    'var el = document.createElement("script"); ' +
+    'el.textContent = new TextDecoder().decode(Uint8Array.from(bin, function (c) { return c.charCodeAt(0); })); ' +
+    'document.body.appendChild(el); })();</script>';
+}
 
 // ---------- cache ----------
 

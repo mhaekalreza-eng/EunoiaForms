@@ -624,8 +624,8 @@ function adminAtur() {
 // ---------- mulai ----------
 // Chart.js dimuat async: kalau CDN lambat/diblokir, dashboard tetap jalan tanpa grafik.
 function loadChartJs() {
-  const srcs = ['https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
-    'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'];
+  const srcs = (window.__CHART_SRC ? [window.__CHART_SRC] : []).concat(['https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+    'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js']);
   (function next(i) {
     if (i >= srcs.length) return;
     const el = document.createElement('script');

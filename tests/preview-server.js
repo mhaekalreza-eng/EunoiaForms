@@ -27,9 +27,8 @@ function page() {
   const nama = g.getSettings_().NAMA_KAS;
   return read('Index.html')
     .replace(/<\?!= include\('Css'\); \?>/, read('Css.html'))
-    .replace(/<\?!= include\('App'\); \?>/, shim + read('App.html'))
-    .replace(/<\?= namaKas \?>/g, nama)
-    .replace(/https:\/\/cdnjs[^'"]+?chart\.umd\.min\.js/, vendor ? '/chart.js' : '$&');
+    .replace(/<\?!= include\('App'\); \?>/, () => shim + (vendor ? '<script>window.__CHART_SRC = "/chart.js";</script>' : '') + g.include('App'))
+    .replace(/<\?= namaKas \?>/g, nama);
 }
 const vendor = process.env.CHART_JS; // salinan Chart.js lokal (opsional, untuk preview offline)
 http.createServer((req, res) => {

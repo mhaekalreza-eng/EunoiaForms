@@ -78,13 +78,15 @@ function createGas(opts = {}) {
       },
       getUuid: () => crypto.randomUUID(),
       computeDigest: (alg, s) => Array.from(crypto.createHash('sha256').update(s, 'utf8').digest()).map(b => (b > 127 ? b - 256 : b)),
-      base64Encode: bytes => Buffer.from(bytes.map(b => (b + 256) % 256)).toString('base64'),
+      base64Encode: data => (typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data.map(b => (b + 256) % 256))).toString('base64'),
       base64Decode: s => Array.from(Buffer.from(s, 'base64')),
       newBlob: (data, mime, name) => ({ data, mime, name, getAs: () => ({ setName: () => ({}) }), setName() { return this; } }),
       sleep: () => {},
       DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' }
     },
-    HtmlService: {},
+    HtmlService: {
+      createTemplateFromFile: n => ({ getRawContent: () => fs.readFileSync(path.join(__dirname, '..', 'apps-script', n + '.html'), 'utf8') })
+    },
     ContentService: { createTextOutput: s => ({ setMimeType: () => s }), MimeType: {} },
     UrlFetchApp: { fetch: () => { throw new Error('network disabled in mock'); } }
   };
