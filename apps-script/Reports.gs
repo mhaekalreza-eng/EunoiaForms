@@ -61,7 +61,7 @@ function laporanWaText_(r, S, ym) {
     });
   } else lines.push('✅ Semua kavling lunas s/d ' + labelBulan(r.bulanIni));
   var url = ScriptApp.getService().getUrl();
-  if (url) { lines.push(''); lines.push('Detail & konfirmasi bayar: ' + url); }
+  if (url) { lines.push(''); lines.push('Laporan lengkap: ' + url + '?tab=ringkasan'); lines.push('Konfirmasi bayar: ' + url); }
   return lines.join('\n');
 }
 

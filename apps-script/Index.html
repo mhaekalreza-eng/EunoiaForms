@@ -7,14 +7,14 @@
   <title><?= namaKas ?></title>
   <?!= include('Css'); ?>
 </head>
-<body>
+<body data-tab="<?= tabAwal ?>">
   <header class="top">
     <h1 id="judul"><?= namaKas ?></h1>
     <div class="sub" id="subjudul">Memuat…</div>
   </header>
 
   <main>
-    <section class="tab on" id="tab-ringkasan"><div class="loading">Memuat data kas…</div></section>
+    <section class="tab" id="tab-ringkasan"><div class="loading">Memuat data kas…</div></section>
     <section class="tab" id="tab-iuran"></section>
     <section class="tab" id="tab-transaksi"></section>
     <section class="tab" id="tab-bayar"></section>
@@ -22,10 +22,10 @@
   </main>
 
   <nav class="bottom" aria-label="Menu">
-    <button data-tab="ringkasan" class="on"><span class="ico">⌂</span>Ringkasan</button>
+    <button data-tab="ringkasan"><span class="ico">⌂</span>Ringkasan</button>
     <button data-tab="iuran"><span class="ico">▦</span>Iuran</button>
+    <button data-tab="bayar" class="utama"><span class="ico">＋</span>Bayar</button>
     <button data-tab="transaksi"><span class="ico">⇅</span>Transaksi</button>
-    <button data-tab="bayar"><span class="ico">＋</span>Bayar</button>
     <button data-tab="bendahara"><span class="ico">⚿</span>Bendahara</button>
   </nav>
 

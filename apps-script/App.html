@@ -643,6 +643,7 @@ setTimeout(() => {
   $('#tab-ringkasan').insertAdjacentHTML('beforeend', '<div class="note" style="margin-top:12px">Masih memuat? Kalau browser ini login ke lebih dari satu akun Google, ' +
     'buka link ini di jendela Incognito/Private atau logout akun lain dulu. Kalau masih gagal, bendahara bisa cek menu Executions di Apps Script.</div>');
 }, 15000);
+showTab(document.body.dataset.tab || 'bayar');
 loadPublic()
   .then(() => { if (S.token) loadAdmin(); })
   .catch(e => { $('#tab-ringkasan').innerHTML = '<div class="card err">Gagal memuat: ' + esc(e.message) + '</div>'; });

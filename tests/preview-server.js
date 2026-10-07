@@ -28,7 +28,8 @@ function page() {
   return read('Index.html')
     .replace(/<\?!= include\('Css'\); \?>/, read('Css.html'))
     .replace(/<\?!= include\('App'\); \?>/, () => shim + (vendor ? '<script>window.__CHART_SRC = "/chart.js";</script>' : '') + g.include('App'))
-    .replace(/<\?= namaKas \?>/g, nama);
+    .replace(/<\?= namaKas \?>/g, nama)
+    .replace('<?= tabAwal ?>', 'bayar');
 }
 const vendor = process.env.CHART_JS; // salinan Chart.js lokal (opsional, untuk preview offline)
 http.createServer((req, res) => {

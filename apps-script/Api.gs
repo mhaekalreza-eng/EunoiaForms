@@ -19,6 +19,9 @@ function doGet(e) {
   }
   var t = HtmlService.createTemplateFromFile('Index');
   t.namaKas = getSettings_().NAMA_KAS || 'Kas Eunoia';
+  // Link biasa langsung membuka form Bayar; ?tab=ringkasan / iuran / transaksi / bendahara untuk tab lain.
+  var tab = e && e.parameter && e.parameter.tab;
+  t.tabAwal = ['ringkasan', 'iuran', 'transaksi', 'bayar', 'bendahara'].indexOf(tab) >= 0 ? tab : 'bayar';
   return t.evaluate()
     .setTitle(t.namaKas)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
