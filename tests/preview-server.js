@@ -29,7 +29,10 @@ function page() {
     .replace(/<\?!= include\('Css'\); \?>/, read('Css.html'))
     .replace(/<\?!= include\('App'\); \?>/, () => shim + (vendor ? '<script>window.__CHART_SRC = "/chart.js";</script>' : '') + g.include('App'))
     .replace(/<\?= namaKas \?>/g, nama)
-    .replace('<?= tabAwal ?>', 'bayar');
+    .replace('<?= tabAwal ?>', 'bayar')
+    .replace('<?= bayarOn ?>', 'on')
+    .replace('<?= logo ?>', g.LOGO_DATA_URI)
+    .replace('<?!= hero ?>', () => g.heroHtml_('https://script.google.com/macros/s/DEMO/exec'));
 }
 const vendor = process.env.CHART_JS; // salinan Chart.js lokal (opsional, untuk preview offline)
 http.createServer((req, res) => {

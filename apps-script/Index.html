@@ -5,19 +5,30 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?= namaKas ?></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
   <?!= include('Css'); ?>
 </head>
 <body data-tab="<?= tabAwal ?>">
+  <div class="progress" aria-hidden="true"><i id="progress"></i></div>
   <header class="top">
-    <h1 id="judul"><?= namaKas ?></h1>
-    <div class="sub" id="subjudul">Memuat…</div>
+    <img class="logo" src="<?= logo ?>" alt="Logo Eunoia Residence" width="40" height="40">
+    <div>
+      <h1 id="judul"><?= namaKas ?></h1>
+      <div class="sub" id="subjudul">Eunoia Residence · transparan untuk semua warga</div>
+    </div>
   </header>
 
   <main>
     <section class="tab" id="tab-ringkasan"><div class="loading">Memuat data kas…</div></section>
     <section class="tab" id="tab-iuran"></section>
     <section class="tab" id="tab-transaksi"></section>
-    <section class="tab" id="tab-bayar"></section>
+    <section class="tab <?= bayarOn ?>" id="tab-bayar">
+      <?!= hero ?>
+      <div id="form-bayar"><div id="bayar-form"><noscript><div class="card"><h2>Konfirmasi pembayaran</h2>
+        <p class="desc">Form konfirmasi butuh JavaScript. Transfer ke rekening di atas, lalu kirim bukti transfer ke bendahara lewat WhatsApp.</p></div></noscript></div></div>
+    </section>
     <section class="tab" id="tab-bendahara"></section>
   </main>
 

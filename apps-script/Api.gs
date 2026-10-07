@@ -22,6 +22,10 @@ function doGet(e) {
   // Link biasa langsung membuka form Bayar; ?tab=ringkasan / iuran / transaksi / bendahara untuk tab lain.
   var tab = e && e.parameter && e.parameter.tab;
   t.tabAwal = ['ringkasan', 'iuran', 'transaksi', 'bayar', 'bendahara'].indexOf(tab) >= 0 ? tab : 'bayar';
+  t.bayarOn = t.tabAwal === 'bayar' ? 'on' : '';
+  t.appUrl = ScriptApp.getService().getUrl() || '';
+  t.logo = LOGO_DATA_URI;
+  t.hero = heroHtml_(t.appUrl);
   return t.evaluate()
     .setTitle(t.namaKas)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');

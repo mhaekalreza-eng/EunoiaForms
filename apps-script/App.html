@@ -293,7 +293,7 @@ function renderTransaksi() {
 
 // ---------- bayar (warga) ----------
 async function renderBayar() {
-  const el = $('#tab-bayar');
+  const el = $('#bayar-form');
   if (!S.formInfo) {
     el.innerHTML = '<div class="loading">Memuat form…</div>';
     try { S.formInfo = JSON.parse(await run('apiFormInfo')); } catch (e) { el.innerHTML = '<div class="err">' + esc(e.message) + '</div>'; return; }
@@ -301,16 +301,8 @@ async function renderBayar() {
   if (!S.form) S.form = { kavling: store.get('kas_kav') || '', tipe: 'iuran', bulan: [], khusus_id: '', nominal: '', manual: false, tanggal: todayIso(), catatan: '', file: null };
   drawBayar();
 }
-/** "BCA 7145127211 a.n. Nama" → {bank, nomor, tampil: "714 512 7211", nama} */
-function parseRekening(info) {
-  const m = String(info || '').match(/^\s*([A-Za-z][\w ]*?)\s+([\d][\d\s.-]{5,})\s*(?:a\.?\s*n\.?\s*(.+))?$/i);
-  if (!m) return null;
-  const nomor = m[2].replace(/\D/g, '');
-  const tampil = nomor.length === 10 ? nomor.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3') : nomor.replace(/(\d{4})(?=\d)/g, '$1 ');
-  return { bank: m[1].trim(), nomor, tampil, nama: (m[3] || '').trim() };
-}
 function drawBayar() {
-  const info = S.formInfo, f = S.form, el = $('#tab-bayar');
+  const info = S.formInfo, f = S.form, el = $('#bayar-form');
   const r = info.rumah.find(x => x.kavling === f.kavling);
   const lo = addM(info.bulanIni, -11), hi = addM(info.bulanIni, 6);
   const bulan = r ? r.bulan.filter(b => b.ym >= lo && b.ym <= hi) : [];
@@ -318,14 +310,7 @@ function drawBayar() {
     f.nominal = f.tipe === 'khusus' ? ((info.khusus.find(k => k.id === f.khusus_id) || {}).nominal || '')
       : f.bulan.reduce((a, ym) => a + ((bulan.find(b => b.ym === ym) || {}).tarif || 0), 0) || '';
   }
-  const rek = parseRekening(info.rekeningInfo);
-  el.innerHTML = `${rek ? `<div class="card rek">
-    <div class="small muted">Transfer iuran ke rekening kas</div>
-    <div class="rek-bank">${esc(rek.bank)}</div>
-    <div class="rek-no tnum" id="rek-no">${esc(rek.tampil)}</div>
-    ${rek.nama ? `<div class="small">a.n. ${esc(rek.nama)}</div>` : ''}
-    <button class="btn block" id="rek-copy" style="margin-top:12px">Salin nomor rekening</button>
-  </div>` : ''}
+  el.innerHTML = `
   <div class="card">
     <h2>Konfirmasi pembayaran</h2>
     <p class="desc">Setelah transfer, isi form ini. Status jadi ✓ setelah bendahara upload mutasi bank. Kalau lupa isi form pun tetap tercatat dari mutasi, tapi form ini membantu mencocokkan.</p>
@@ -349,7 +334,6 @@ function drawBayar() {
     <div id="f-err" class="err" style="margin-top:8px"></div>
     <button class="btn block" id="f-kirim" style="margin-top:14px">Kirim konfirmasi</button>
   </div>`;
-  if (rek) $('#rek-copy').onclick = () => copyText(rek.nomor, 'Nomor rekening ' + rek.nomor + ' tersalin');
   $('#f-kav').onchange = e => { f.kavling = e.target.value; f.bulan = []; f.manual = false; store.set('kas_kav', f.kavling); drawBayar(); };
   document.querySelectorAll('[data-tipe]').forEach(b => b.onclick = () => { f.tipe = b.dataset.tipe; f.manual = false; drawBayar(); });
   if ($('#f-kh')) $('#f-kh').onchange = e => { f.khusus_id = e.target.value; f.manual = false; drawBayar(); };
@@ -373,7 +357,7 @@ async function kirimKlaim() {
   try {
     const bukti = f.file ? await fileToBase64(f.file) : null;
     await run('apiSubmitKlaim', { kavling: f.kavling, tipe: f.tipe, bulan: f.bulan, khusus_id: f.khusus_id, nominal: +f.nominal, tanggal: f.tanggal, catatan: f.catatan, bukti });
-    $('#tab-bayar').innerHTML = `<div class="card"><h2>Terima kasih! 🙏</h2><p>Konfirmasi ${esc(f.kavling)} sebesar <b>${rp(f.nominal)}</b>${f.bulan.length ? ' untuk ' + esc(f.bulan.map(lb).join(', ')) : ''} sudah tercatat.</p>
+    $('#bayar-form').innerHTML = `<div class="card"><h2>Terima kasih! 🙏</h2><p>Konfirmasi ${esc(f.kavling)} sebesar <b>${rp(f.nominal)}</b>${f.bulan.length ? ' untuk ' + esc(f.bulan.map(lb).join(', ')) : ''} sudah tercatat.</p>
       <p class="small muted">Statusnya “menunggu” sampai bendahara mengupload mutasi bank bulan ini, lalu otomatis jadi ✓.</p>
       <button class="btn ghost" id="f-lagi">Isi lagi</button></div>`;
     S.form = null; S.formInfo = null;
@@ -668,6 +652,45 @@ setTimeout(() => {
   $('#tab-ringkasan').insertAdjacentHTML('beforeend', '<div class="note" style="margin-top:12px">Masih memuat? Kalau browser ini login ke lebih dari satu akun Google, ' +
     'buka link ini di jendela Incognito/Private atau logout akun lain dulu. Kalau masih gagal, bendahara bisa cek menu Executions di Apps Script.</div>');
 }, 15000);
+// ---------- gerak halus: progres scroll, parallax foto, hitung naik, salin, link tab ----------
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+(function motion() {
+  const bar = $('#progress');
+  const ph = document.querySelector('.hero-img .ph');
+  let ticking = false;
+  function frame() {
+    ticking = false;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    if (bar) bar.style.transform = 'scaleX(' + (max > 0 ? Math.min(1, window.scrollY / max) : 0) + ')';
+    if (ph && !reduceMotion) ph.style.transform = 'translate3d(0,' + Math.round(window.scrollY * 0.12) + 'px,0)';
+  }
+  window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(frame); } }, { passive: true });
+  frame();
+})();
+function countUp(el) {
+  const to = +el.dataset.to, fmt = el.dataset.fmt;
+  const show = v => el.textContent = fmt === 'rp' ? rp(v) : String(Math.round(v));
+  if (reduceMotion || !(to > 0)) return show(to);
+  const t0 = performance.now(), dur = 1100;
+  (function step(t) {
+    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    show(to * e);
+    if (k < 1) requestAnimationFrame(step); else show(to);
+  })(t0);
+}
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver(entries => entries.forEach(en => {
+    if (en.isIntersecting) { io.unobserve(en.target); countUp(en.target); }
+  }), { threshold: 0.6 });
+  document.querySelectorAll('.count').forEach(el => io.observe(el));
+}
+document.addEventListener('click', e => {
+  const c = e.target.closest('[data-copy]');
+  if (c) { e.preventDefault(); copyText(c.dataset.copy, 'Nomor rekening ' + c.dataset.copy + ' tersalin'); return; }
+  const g = e.target.closest('[data-goto]');
+  if (g) { e.preventDefault(); showTab(g.dataset.goto); }
+});
+
 showTab(document.body.dataset.tab || 'bayar');
 loadPublic()
   .then(() => { if (S.token) loadAdmin(); })
