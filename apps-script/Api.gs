@@ -4,7 +4,19 @@
  * fungsi bendahara wajib membawa token sesi dari apiLogin().
  */
 
-function doGet() {
+function doGet(e) {
+  // ?debug=1 → jalankan apiPublic() langsung di server dan tampilkan hasil/error-nya (untuk diagnosa).
+  if (e && e.parameter && e.parameter.debug) {
+    var out;
+    try {
+      var t0 = Date.now();
+      var json = apiPublic();
+      out = 'OK dalam ' + (Date.now() - t0) + ' ms, ' + json.length + ' karakter\n\n' + json.slice(0, 3000);
+    } catch (err) {
+      out = 'ERROR: ' + err.message + '\n\n' + (err.stack || '');
+    }
+    return ContentService.createTextOutput(out);
+  }
   var t = HtmlService.createTemplateFromFile('Index');
   t.namaKas = getSettings_().NAMA_KAS || 'Kas Eunoia';
   return t.evaluate()

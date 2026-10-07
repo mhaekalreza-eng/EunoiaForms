@@ -1,5 +1,13 @@
 <script>
-/* Kas Eunoia — UI web app (vanilla JS). Data dari Api.js lewat google.script.run. */
+/* Kas Eunoia — UI web app (vanilla JS). Data dari Api.gs lewat google.script.run. */
+// Tampilkan error JavaScript di halaman, supaya kelihatan tanpa membuka console.
+function showFatal(msg) {
+  const el = document.getElementById('tab-ringkasan');
+  if (el) el.insertAdjacentHTML('beforeend', '<div class="note err" style="margin-top:12px">Error: ' +
+    String(msg).replace(/[<>&]/g, '') + '</div>');
+}
+window.addEventListener('error', e => showFatal(e.message + (e.lineno ? ' (baris ' + e.lineno + ')' : '')));
+window.addEventListener('unhandledrejection', e => showFatal(e.reason && e.reason.message || e.reason));
 const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 const KELAS = {
   iuran: 'Iuran', khusus: 'Iuran khusus', pengeluaran: 'Pengeluaran', biaya_bank: 'Biaya bank', bunga: 'Bunga bank',
