@@ -55,9 +55,17 @@ function modal(html) { $('#modal-body').innerHTML = html; $('#modal').classList.
 function closeModal() { $('#modal').classList.remove('on'); }
 $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
 
-async function copyText(text) {
-  try { await navigator.clipboard.writeText(text); toast('Tersalin. Tinggal paste di WhatsApp.'); }
+function copyViaTextarea(text) {
+  const t = document.createElement('textarea');
+  t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+  document.body.appendChild(t); t.select(); t.setSelectionRange(0, text.length);
+  let ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  t.remove(); return ok;
+}
+async function copyText(text, pesan = 'Tersalin. Tinggal paste di WhatsApp.') {
+  try { await navigator.clipboard.writeText(text); toast(pesan); }
   catch (e) {
+    if (copyViaTextarea(text)) { toast(pesan); return; }
     modal(`<h2>Salin teks</h2><p class="desc">Tekan lama → Pilih semua → Salin.</p><textarea id="cp" style="min-height:260px">${esc(text)}</textarea>
       <div class="row" style="margin-top:10px"><button class="btn" onclick="const t=$('#cp');t.select();document.execCommand('copy');toast('Tersalin')">Salin</button>
       <button class="btn ghost" onclick="closeModal()">Tutup</button></div>`);
@@ -293,6 +301,14 @@ async function renderBayar() {
   if (!S.form) S.form = { kavling: store.get('kas_kav') || '', tipe: 'iuran', bulan: [], khusus_id: '', nominal: '', manual: false, tanggal: todayIso(), catatan: '', file: null };
   drawBayar();
 }
+/** "BCA 7145127211 a.n. Nama" → {bank, nomor, tampil: "714 512 7211", nama} */
+function parseRekening(info) {
+  const m = String(info || '').match(/^\s*([A-Za-z][\w ]*?)\s+([\d][\d\s.-]{5,})\s*(?:a\.?\s*n\.?\s*(.+))?$/i);
+  if (!m) return null;
+  const nomor = m[2].replace(/\D/g, '');
+  const tampil = nomor.length === 10 ? nomor.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3') : nomor.replace(/(\d{4})(?=\d)/g, '$1 ');
+  return { bank: m[1].trim(), nomor, tampil, nama: (m[3] || '').trim() };
+}
 function drawBayar() {
   const info = S.formInfo, f = S.form, el = $('#tab-bayar');
   const r = info.rumah.find(x => x.kavling === f.kavling);
@@ -302,9 +318,17 @@ function drawBayar() {
     f.nominal = f.tipe === 'khusus' ? ((info.khusus.find(k => k.id === f.khusus_id) || {}).nominal || '')
       : f.bulan.reduce((a, ym) => a + ((bulan.find(b => b.ym === ym) || {}).tarif || 0), 0) || '';
   }
-  el.innerHTML = `<div class="card">
+  const rek = parseRekening(info.rekeningInfo);
+  el.innerHTML = `${rek ? `<div class="card rek">
+    <div class="small muted">Transfer iuran ke rekening kas</div>
+    <div class="rek-bank">${esc(rek.bank)}</div>
+    <div class="rek-no tnum" id="rek-no">${esc(rek.tampil)}</div>
+    ${rek.nama ? `<div class="small">a.n. ${esc(rek.nama)}</div>` : ''}
+    <button class="btn block" id="rek-copy" style="margin-top:12px">Salin nomor rekening</button>
+  </div>` : ''}
+  <div class="card">
     <h2>Konfirmasi pembayaran</h2>
-    <p class="desc">Transfer dulu ke ${esc(info.rekeningInfo || 'rekening kas')}, lalu isi form ini. Status jadi ✓ setelah bendahara upload mutasi bank. Kalau lupa isi form pun tetap tercatat dari mutasi, tapi form ini membantu mencocokkan.</p>
+    <p class="desc">Setelah transfer, isi form ini. Status jadi ✓ setelah bendahara upload mutasi bank. Kalau lupa isi form pun tetap tercatat dari mutasi, tapi form ini membantu mencocokkan.</p>
     <label class="f" for="f-kav">Kavling</label>
     <select id="f-kav"><option value="">— pilih —</option>${info.rumah.map(x => `<option value="${esc(x.kavling)}" ${x.kavling === f.kavling ? 'selected' : ''}>${esc(x.kavling + ' – ' + x.nama)}</option>`).join('')}</select>
     ${info.khusus.length ? `<label class="f">Jenis</label><div class="seg"><button data-tipe="iuran" class="${f.tipe === 'iuran' ? 'on' : ''}">Iuran bulanan</button><button data-tipe="khusus" class="${f.tipe === 'khusus' ? 'on' : ''}">Iuran khusus</button></div>` : ''}
@@ -325,6 +349,7 @@ function drawBayar() {
     <div id="f-err" class="err" style="margin-top:8px"></div>
     <button class="btn block" id="f-kirim" style="margin-top:14px">Kirim konfirmasi</button>
   </div>`;
+  if (rek) $('#rek-copy').onclick = () => copyText(rek.nomor, 'Nomor rekening ' + rek.nomor + ' tersalin');
   $('#f-kav').onchange = e => { f.kavling = e.target.value; f.bulan = []; f.manual = false; store.set('kas_kav', f.kavling); drawBayar(); };
   document.querySelectorAll('[data-tipe]').forEach(b => b.onclick = () => { f.tipe = b.dataset.tipe; f.manual = false; drawBayar(); });
   if ($('#f-kh')) $('#f-kh').onchange = e => { f.khusus_id = e.target.value; f.manual = false; drawBayar(); };
