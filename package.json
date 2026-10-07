@@ -1,0 +1,8 @@
+{
+  "name": "kas-eunoia",
+  "private": true,
+  "description": "Buku kas perumahan: Google Sheets + Apps Script",
+  "scripts": {
+    "test": "node tests/server.test.js"
+  }
+}

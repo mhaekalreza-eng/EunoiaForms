@@ -1,0 +1,211 @@
+{
+ "settings": {
+  "NAMA_KAS": "Kas Contoh",
+  "NAMA_REKENING_BENDAHARA": "BENDAHARA KITA",
+  "MULAI_TRACKING": "2026-08",
+  "REKENING_INFO": "BCA 0000000000 a.n. Bendahara"
+ },
+ "rumah": [
+  {
+   "kavling": "Kav. 1",
+   "nama": "Pak Budi",
+   "rekening": [
+    "BUDI SANTOSO"
+   ]
+  },
+  {
+   "kavling": "Kav. 2",
+   "nama": "Bu Citra",
+   "rekening": [
+    "CITRA LESTARI"
+   ]
+  },
+  {
+   "kavling": "Kav. 3",
+   "nama": "Pak Dodi",
+   "rekening": []
+  }
+ ],
+ "tarif": [
+  {
+   "kavling": "*",
+   "mulai": "2026-08",
+   "nominal": 300000
+  },
+  {
+   "kavling": "Kav. 2",
+   "mulai": "2026-08",
+   "nominal": 350000
+  }
+ ],
+ "expected": [
+  {
+   "id": "SAMPAH",
+   "nama": "Sampah",
+   "kategori": "Sampah",
+   "nominal": 500000,
+   "tgl": 5,
+   "pola": "TUKANG SAMPAH",
+   "mulai": "2026-08"
+  },
+  {
+   "id": "SATPAM",
+   "nama": "Gaji Satpam",
+   "kategori": "Gaji Satpam",
+   "nominal": 1000000,
+   "tgl": 5,
+   "pola": "PAK SATPAM",
+   "mulai": "2026-08"
+  }
+ ],
+ "khusus": [],
+ "statements": [
+  {
+   "rekening": "0000000000",
+   "periode": "2026-08",
+   "saldo_awal": 1000000.0,
+   "total_cr": 1250012.5,
+   "total_db": 1512500,
+   "saldo_akhir": 737512.5,
+   "transaksi": [
+    {
+     "tanggal": "2026-08-02",
+     "jenis": "CR",
+     "nominal": 600000,
+     "keterangan": "TRSF E-BANKING CR",
+     "pihak": "BUDI SANTOSO",
+     "berita": "kav 1 agustus september",
+     "urutan": 1
+    },
+    {
+     "tanggal": "2026-08-03",
+     "jenis": "DB",
+     "nominal": 10000,
+     "keterangan": "BIAYA ADM",
+     "urutan": 2,
+     "berita": "",
+     "pihak": ""
+    },
+    {
+     "tanggal": "2026-08-05",
+     "jenis": "DB",
+     "nominal": 500000,
+     "keterangan": "TRSF E-BANKING DB",
+     "pihak": "TUKANG SAMPAH",
+     "urutan": 3,
+     "berita": ""
+    },
+    {
+     "tanggal": "2026-08-06",
+     "jenis": "DB",
+     "nominal": 1000000,
+     "keterangan": "BI-FAST DB BIF TRANSFER KE",
+     "pihak": "PAK SATPAM",
+     "urutan": 4,
+     "berita": ""
+    },
+    {
+     "tanggal": "2026-08-06",
+     "jenis": "DB",
+     "nominal": 2500,
+     "keterangan": "BI-FAST DB BIF BIAYA TXN KE",
+     "pihak": "PAK SATPAM",
+     "urutan": 5,
+     "berita": ""
+    },
+    {
+     "tanggal": "2026-08-10",
+     "jenis": "CR",
+     "nominal": 350000,
+     "keterangan": "BI-FAST CR BIF TRANSFER DR",
+     "pihak": "CITRA LESTARI",
+     "urutan": 6,
+     "berita": ""
+    },
+    {
+     "tanggal": "2026-08-20",
+     "jenis": "CR",
+     "nominal": 300000,
+     "keterangan": "TRSF E-BANKING CR",
+     "pihak": "DOMPET ANAK BANGSA",
+     "berita": "GoPay Bank Transfe",
+     "urutan": 7
+    },
+    {
+     "tanggal": "2026-08-31",
+     "jenis": "CR",
+     "nominal": 12.5,
+     "keterangan": "BUNGA",
+     "urutan": 8,
+     "berita": "",
+     "pihak": ""
+    }
+   ]
+  },
+  {
+   "rekening": "0000000000",
+   "periode": "2026-09",
+   "saldo_awal": 737512.5,
+   "total_cr": 1050010.1,
+   "total_db": 1512500,
+   "saldo_akhir": 275022.6,
+   "transaksi": [
+    {
+     "tanggal": "2026-09-04",
+     "jenis": "DB",
+     "nominal": 500000,
+     "keterangan": "TRSF E-BANKING DB",
+     "pihak": "TUKANG SAMPAH",
+     "urutan": 1,
+     "berita": ""
+    },
+    {
+     "tanggal": "2026-09-05",
+     "jenis": "DB",
+     "nominal": 10000,
+     "keterangan": "BIAYA ADM",
+     "urutan": 2,
+     "berita": "",
+     "pihak": ""
+    },
+    {
+     "tanggal": "2026-09-07",
+     "jenis": "CR",
+     "nominal": 1050000,
+     "keterangan": "TRSF E-BANKING CR",
+     "pihak": "BENDAHARA KITA",
+     "berita": "Citra sep okt nov",
+     "urutan": 3
+    },
+    {
+     "tanggal": "2026-09-10",
+     "jenis": "DB",
+     "nominal": 1000000,
+     "keterangan": "BI-FAST DB BIF TRANSFER KE",
+     "pihak": "PAK SATPAM",
+     "urutan": 4,
+     "berita": ""
+    },
+    {
+     "tanggal": "2026-09-10",
+     "jenis": "DB",
+     "nominal": 2500,
+     "keterangan": "BI-FAST DB BIF BIAYA TXN KE",
+     "pihak": "PAK SATPAM",
+     "urutan": 5,
+     "berita": ""
+    },
+    {
+     "tanggal": "2026-09-30",
+     "jenis": "CR",
+     "nominal": 10.1,
+     "keterangan": "BUNGA",
+     "urutan": 6,
+     "berita": "",
+     "pihak": ""
+    }
+   ]
+  }
+ ],
+ "tags": {}
+}

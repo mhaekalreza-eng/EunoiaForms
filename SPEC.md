@@ -14,18 +14,19 @@ Sistem kas perumahan berbasis Google Sheets + Apps Script web app. Bahasa Indone
 
 | Tab | Isi | Diisi oleh |
 |---|---|---|
-| `Rumah` | kavling, nama perwakilan, tarif/bulan, berlaku_mulai, daftar nama rekening dikenal (dipisah `;`), aktif | Bendahara (Settings) |
-| `Tarif` | riwayat tarif per kavling (contoh: Kav. 22 = 380.000 mulai 2026-01) | Bendahara |
-| `Klaim` | semua submission: id, waktu, jalur (`warga`/`bendahara`), kavling, tipe, nominal, tanggal transfer, bulan yang diklaim, bukti (opsional), catatan, status | Web app |
-| `Mutasi` | baris mutasi BCA hasil parsing: id, tanggal, keterangan mentah, pengirim/penerima, berita, CR/DB, nominal, saldo, sumber (PDF/paste), batch import | Import (Claude) |
-| `Alokasi` | hasil pemecahan: mutasi/klaim → kavling × bulan iuran × nominal, atau → kategori pengeluaran | Script (matcher) + override manual |
-| `Pengeluaran` | daftar pengeluaran final (dari mutasi DB + klaim bendahara), kategori, penerima, bulan beban | Script |
-| `Expected` | pengeluaran rutin: nama, nominal, tanggal jatuh tempo, kategori, pola penerima (contoh: Sampah 960.000 tgl 5; Gaji Satpam 2.000.000 tgl 5) | Bendahara |
-| `IuranKhusus` | kampanye (THR, 17-an): nama, nominal/rumah, deadline | Bendahara |
-| `Utang` | utang kas ke bendahara (tombokan) dan pelunasannya | Bendahara |
-| `Saldo` | snapshot saldo dari setiap statement (saldo awal/akhir, periode) | Import |
-| `Settings` | PIN (hash), email bendahara aktif, nama kas, toleransi matching, tanggal reminder | Bendahara |
-| `Log` | audit trail: siapa/kapan/apa (import, override, ubah PIN) | Script |
+| `Settings` | key/value: nama kas, rekening tujuan, email & nama rekening bendahara, toleransi hari, PIN (hash+salt), folder Drive | Setup / Pengaturan |
+| `Rumah` | kavling, nama perwakilan, nama rekening dikenal (dipisah `;`), nomor WA, aktif | Import seed / Pengaturan / tag "ingat pengirim" |
+| `Tarif` | kavling (`*` = semua), mulai (YYYY-MM), nominal. Aturan per kavling menang atas `*` | Bendahara |
+| `Expected` | pengeluaran rutin: nama, kategori, nominal, tanggal, pola nama penerima di mutasi, mulai | Bendahara |
+| `IuranKhusus` | kampanye (THR, 17-an): nominal/rumah, mulai, deadline, aktif | Pengaturan |
+| `Mutasi` | baris mutasi BCA: id (`periode-urutan`), tanggal, CR/DB, nominal, keterangan, pihak, berita | Import |
+| `Saldo` | ringkasan tiap statement: saldo awal/akhir, total CR/DB | Import |
+| `Klaim` | klaim warga, input bendahara, prepaid lama: jalur, tipe, kavling, bulan, nominal, tanggal, kategori, sumber dana, bukti | Web app / import lama |
+| `Tag` | klasifikasi manual per mutasi (menang atas aturan otomatis) | Review bendahara |
+| `Hasil`, `Matriks` | tampilan hasil hitung untuk dibaca langsung di Sheets (ditulis ulang otomatis) | Script |
+| `Log` | audit trail | Script |
+
+Alokasi bulan, kredit, utang ke bendahara, dan status klaim **tidak disimpan**: semuanya dihitung ulang dari tab di atas setiap kali dashboard dibuka (`Engine.js`), jadi tidak ada angka yang bisa basi.
 
 ## 3. Jalur Data Masuk
 

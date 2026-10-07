@@ -1,0 +1,620 @@
+<script>
+/* Kas Eunoia — UI web app (vanilla JS). Data dari Api.js lewat google.script.run. */
+const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const KELAS = {
+  iuran: 'Iuran', khusus: 'Iuran khusus', pengeluaran: 'Pengeluaran', biaya_bank: 'Biaya bank', bunga: 'Bunga bank',
+  tombokan: 'Tombokan bendahara', pelunasan: 'Pelunasan utang', pemasukan_lain: 'Pemasukan lain', review: 'Perlu dicek', abaikan: 'Diabaikan'
+};
+const CELL = {
+  lunas: { sym: '✓', cls: 'c-lunas', label: 'Lunas (terverifikasi bank)' },
+  prepaid: { sym: 'P', cls: 'c-prepaid', label: 'Lunas, dibayar sebelum periode tracking' },
+  klaim: { sym: '…', cls: 'c-klaim', label: 'Klaim, menunggu statement bank' },
+  tunggak: { sym: '✗', cls: 'c-tunggak', label: 'Belum bayar' },
+  belum: { sym: '', cls: 'c-belum', label: 'Belum jatuh tempo' }
+};
+
+const store = {
+  get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { v === null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) { /* abaikan */ } }
+};
+const S = { pub: null, admin: null, token: store.get('kas_token'), year: null, saldoMode: 'terkonfirmasi',
+  trxFilter: 'semua', adminTab: 'review', formInfo: null, form: null, charts: {}, preview: null };
+
+// ---------- util ----------
+const $ = (sel, el = document) => el.querySelector(sel);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const rp = n => (n < 0 ? '−' : '') + 'Rp ' + Math.round(Math.abs(+n || 0)).toLocaleString('id-ID');
+const rpShort = n => { const a = Math.abs(n); return a >= 1e6 ? (n / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 }) + ' jt' : a >= 1e3 ? Math.round(n / 1e3) + ' rb' : String(n); };
+const lb = ym => BULAN[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4);
+const lbShort = ym => BULAN[+ym.slice(5, 7) - 1] + " '" + ym.slice(2, 4);
+const tgl = iso => iso ? (+iso.slice(8, 10)) + ' ' + BULAN[+iso.slice(5, 7) - 1] + ' ' + iso.slice(0, 4) : '-';
+const addM = (ym, n) => { let y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1 + n; y += Math.floor(m / 12); m = ((m % 12) + 12) % 12; return y + '-' + String(m + 1).padStart(2, '0'); };
+const rangeBulan = list => !list || !list.length ? '' : list.length === 1 ? lb(list[0]) : lbShort(list[0]) + '–' + lbShort(list[list.length - 1]) + ' (' + list.length + ' bln)';
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const todayIso = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+
+function run(fn, ...args) {
+  return new Promise((resolve, reject) => {
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
+  });
+}
+function toast(msg, ms = 3500) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), ms);
+}
+function fail(e) { toast(e && e.message ? e.message : String(e), 6000); }
+function modal(html) { $('#modal-body').innerHTML = html; $('#modal').classList.add('on'); }
+function closeModal() { $('#modal').classList.remove('on'); }
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast('Tersalin. Tinggal paste di WhatsApp.'); }
+  catch (e) {
+    modal(`<h2>Salin teks</h2><p class="desc">Tekan lama → Pilih semua → Salin.</p><textarea id="cp" style="min-height:260px">${esc(text)}</textarea>
+      <div class="row" style="margin-top:10px"><button class="btn" onclick="const t=$('#cp');t.select();document.execCommand('copy');toast('Tersalin')">Salin</button>
+      <button class="btn ghost" onclick="closeModal()">Tutup</button></div>`);
+    $('#cp').select();
+  }
+}
+
+function fileToBase64(file, maxDim = 1600) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Gagal membaca file'));
+    if (file.type.startsWith('image/')) {
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const k = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          resolve({ name: file.name.replace(/\.\w+$/, '') + '.jpg', mime: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.82).split(',')[1] });
+        };
+        img.onerror = () => reject(new Error('Gambar tidak bisa dibaca'));
+        img.src = reader.result;
+      };
+    } else {
+      if (file.size > 5 * 1024 * 1024) return reject(new Error('File maksimal 5 MB'));
+      reader.onload = () => resolve({ name: file.name, mime: file.type || 'application/pdf', data: String(reader.result).split(',')[1] });
+    }
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---------- navigasi ----------
+document.querySelectorAll('nav.bottom button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+function showTab(name) {
+  document.querySelectorAll('nav.bottom button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  document.querySelectorAll('section.tab').forEach(s => s.classList.toggle('on', s.id === 'tab-' + name));
+  window.scrollTo(0, 0);
+  if (name === 'bayar') renderBayar();
+  if (name === 'bendahara') renderBendahara();
+}
+
+async function loadPublic() {
+  const json = await run('apiPublic');
+  S.pub = JSON.parse(json);
+  if (!S.year) S.year = S.pub.bulanIni.slice(0, 4);
+  $('#judul').textContent = S.pub.namaKas;
+  $('#subjudul').textContent = S.pub.bankUntil && S.pub.bankUntil !== '0000-00-00'
+    ? 'Data bank s/d ' + tgl(S.pub.bankUntil) + ' · transparan untuk semua warga'
+    : 'Belum ada mutasi bank';
+  renderRingkasan(); renderIuran(); renderTransaksi();
+}
+
+// ---------- ringkasan ----------
+function renderRingkasan() {
+  const p = S.pub, s = p.saldo;
+  const modes = {
+    terkonfirmasi: { label: 'Bank', val: s.terkonfirmasi, cap: 'Saldo akhir di statement BCA terakhir (per ' + tgl(s.perTanggal) + ').' },
+    estimasi: { label: 'Estimasi', val: s.estimasi, cap: 'Saldo bank + klaim masuk ' + rp(s.masukMenunggu) + ' − klaim keluar ' + rp(s.keluarMenunggu) + ' yang belum ada di statement.' },
+    proyeksi: { label: 'Akhir bulan', val: s.proyeksi, cap: 'Estimasi dikurangi pengeluaran rutin yang belum dibayar s/d ' + lb(p.bulanIni) + ' (' + rp(s.kurangRutin) + ').' }
+  };
+  const m = modes[S.saldoMode];
+  const years = [...new Set(p.cashflow.map(c => c.bulan.slice(0, 4)))].sort();
+  const cf = p.cashflow.filter(c => c.bulan.slice(0, 4) === S.year);
+  const peng = p.pengeluaran[S.year] || {};
+  const pengRows = Object.keys(peng).map(k => [k, peng[k]]).sort((a, b) => b[1] - a[1]);
+  const totalIn = cf.reduce((a, c) => a + c.masuk, 0), totalOut = cf.reduce((a, c) => a + c.keluar, 0);
+  const lastYm = p.bankUntil && p.bankUntil !== '0000-00-00' ? p.bankUntil.slice(0, 7) : p.bulanIni;
+
+  $('#tab-ringkasan').innerHTML = `
+    <div class="card">
+      <div class="seg" role="tablist">${Object.keys(modes).map(k => `<button class="${k === S.saldoMode ? 'on' : ''}" data-mode="${k}">${modes[k].label}</button>`).join('')}</div>
+      <div class="hero tnum">${rp(m.val)}</div>
+      <div class="small muted">${esc(m.cap)}</div>
+      <div class="tiles">
+        <div class="tile"><div class="lbl">Utang kas ke bendahara</div><div class="val">${rp(s.utangBendahara)}</div></div>
+        <div class="tile"><div class="lbl">Saldo bersih (${m.label.toLowerCase()} − utang)</div><div class="val">${rp(m.val - s.utangBendahara)}</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Pengeluaran rutin ${lb(p.bulanIni)}</h2>
+      <p class="desc">Lunas kalau pembayarannya sudah terlihat di mutasi bank atau diinput bendahara.</p>
+      <ul class="list">${p.expected.map(e => `<li class="spread">
+        <div><b>${esc(e.nama)}</b><div class="small muted">${rp(e.nominal)}/bulan · tgl ${e.tgl} · ${e.terbayar}/${e.jatuhTempo} bulan terbayar</div></div>
+        ${e.lunasBulanIni ? `<span class="status good">✓ Lunas${e.selisih > 0 ? ' (+' + e.selisih + ' bln)' : ''}</span>` : `<span class="status bad">✗ Belum${-e.selisih > 1 ? ' (' + (-e.selisih) + ' bln)' : ''}</span>`}
+      </li>`).join('') || '<li class="empty">Belum ada pengeluaran rutin.</li>'}</ul>
+    </div>
+
+    ${years.length > 1 ? `<div class="chips">${years.map(y => `<button class="chip ${y === S.year ? 'on' : ''}" data-year="${y}">${y}</button>`).join('')}</div>` : ''}
+
+    <div class="card">
+      <div class="spread"><h2>Uang masuk & keluar ${S.year}</h2><button class="linkbtn" data-table="t-cf">Tabel</button></div>
+      <p class="desc">Per bulan, berdasarkan tanggal transaksi di bank. Total masuk ${rp(totalIn)} · keluar ${rp(totalOut)}.</p>
+      <div class="legend"><span><i style="background:var(--series-1)"></i>Masuk</span><span><i style="background:var(--series-2)"></i>Keluar</span></div>
+      <div class="chart-wrap"><canvas id="ch-cf" aria-label="Grafik uang masuk dan keluar per bulan"></canvas></div>
+      <div id="t-cf" hidden class="scroll-x"><table class="data"><tr><th>Bulan</th><th class="n">Masuk</th><th class="n">Keluar</th><th class="n">Saldo akhir</th></tr>
+        ${cf.map(c => `<tr><td>${lb(c.bulan)}</td><td class="n">${rp(c.masuk)}</td><td class="n">${rp(c.keluar)}</td><td class="n">${c.saldo_akhir == null ? '-' : rp(c.saldo_akhir)}</td></tr>`).join('')}</table></div>
+    </div>
+
+    <div class="card">
+      <h2>Saldo bank akhir bulan</h2>
+      <p class="desc">Dari ringkasan tiap e-Statement BCA.</p>
+      <div class="chart-wrap"><canvas id="ch-saldo" aria-label="Grafik saldo akhir bulan"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="spread"><h2>Pengeluaran ${S.year} per kategori</h2><button class="linkbtn" data-table="t-peng">Tabel</button></div>
+      <p class="desc">Termasuk biaya admin & transfer bank. Total ${rp(pengRows.reduce((a, r) => a + r[1], 0))}.</p>
+      <div class="chart-wrap" style="height:${Math.max(120, pengRows.length * 40 + 30)}px"><canvas id="ch-peng" aria-label="Grafik pengeluaran per kategori"></canvas></div>
+      <div id="t-peng" hidden><table class="data">${pengRows.map(r => `<tr><td>${esc(r[0])}</td><td class="n">${rp(r[1])}</td></tr>`).join('')}</table></div>
+    </div>
+
+    <div class="card">
+      <h2>Laporan untuk grup WA</h2>
+      <p class="desc">Ringkasan teks bulan terpilih, siap paste.</p>
+      <div class="row"><select id="lap-bulan" style="flex:1">${p.cashflow.map(c => c.bulan).reverse().map(ym => `<option value="${ym}" ${ym === lastYm ? 'selected' : ''}>${lb(ym)}</option>`).join('')}</select>
+      <button class="btn" id="btn-lap">Salin laporan</button></div>
+    </div>`;
+
+  document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { S.saldoMode = b.dataset.mode; renderRingkasan(); });
+  document.querySelectorAll('[data-year]').forEach(b => b.onclick = () => { S.year = b.dataset.year; renderRingkasan(); renderIuran(); });
+  document.querySelectorAll('[data-table]').forEach(b => b.onclick = () => { const t = document.getElementById(b.dataset.table); t.hidden = !t.hidden; b.textContent = t.hidden ? 'Tabel' : 'Sembunyikan'; });
+  $('#btn-lap').onclick = async () => {
+    const btn = $('#btn-lap'); btn.disabled = true;
+    try { copyText(await run('apiLaporanWa', $('#lap-bulan').value)); } catch (e) { fail(e); } finally { btn.disabled = false; }
+  };
+  drawCharts(cf, pengRows);
+}
+
+function baseOpts() {
+  const grid = cssVar('--grid'), muted = cssVar('--muted');
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ' ' + (c.dataset.label ? c.dataset.label + ': ' : '') + rp(c.parsed.y != null && c.chart.options.indexAxis !== 'y' ? c.parsed.y : c.parsed.x) } } },
+    scales: {
+      x: { grid: { display: false }, border: { color: cssVar('--axis') }, ticks: { color: muted, font: { size: 11 } } },
+      y: { grid: { color: grid }, border: { display: false }, ticks: { color: muted, font: { size: 11 }, callback: v => rpShort(v), maxTicksLimit: 5 }, beginAtZero: true }
+    }
+  };
+}
+function mkChart(id, cfg) {
+  if (typeof Chart === 'undefined') return;
+  if (S.charts[id]) S.charts[id].destroy();
+  const el = document.getElementById(id); if (!el) return;
+  S.charts[id] = new Chart(el, cfg);
+}
+function drawCharts(cf, pengRows) {
+  const labels = cf.map(c => lbShort(c.bulan));
+  const bar = { borderRadius: 4, borderSkipped: 'start', maxBarThickness: 18, categoryPercentage: 0.7, barPercentage: 0.85 };
+  mkChart('ch-cf', { type: 'bar', data: { labels, datasets: [
+    Object.assign({ label: 'Masuk', data: cf.map(c => c.masuk), backgroundColor: cssVar('--series-1') }, bar),
+    Object.assign({ label: 'Keluar', data: cf.map(c => c.keluar), backgroundColor: cssVar('--series-2') }, bar)
+  ] }, options: baseOpts() });
+  const o2 = baseOpts(); o2.scales.y.beginAtZero = false;
+  mkChart('ch-saldo', { type: 'line', data: { labels, datasets: [{ label: 'Saldo', data: cf.map(c => c.saldo_akhir), borderColor: cssVar('--series-1'),
+    backgroundColor: cssVar('--series-1'), borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBorderColor: cssVar('--surface'), pointBorderWidth: 2, spanGaps: true }] }, options: o2 });
+  const o3 = baseOpts(); o3.indexAxis = 'y'; o3.interaction = { mode: 'nearest', axis: 'y', intersect: false };
+  o3.scales = { x: { grid: { color: cssVar('--grid') }, border: { display: false }, ticks: { color: cssVar('--muted'), callback: v => rpShort(v), maxTicksLimit: 4 }, beginAtZero: true },
+    y: { grid: { display: false }, border: { color: cssVar('--axis') }, ticks: { color: cssVar('--ink-2'), font: { size: 12 } } } };
+  mkChart('ch-peng', { type: 'bar', data: { labels: pengRows.map(r => r[0]), datasets: [{ data: pengRows.map(r => r[1]), backgroundColor: cssVar('--series-1'),
+    borderRadius: 4, borderSkipped: 'start', maxBarThickness: 18 }] }, options: o3 });
+}
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => S.pub && renderRingkasan());
+
+// ---------- iuran ----------
+function cellState(kav, ym) {
+  const p = S.pub, cell = (p.matriks[kav] || {})[ym];
+  if (cell) return cell.status;
+  if (ym < p.mulai) return null;
+  return ym <= p.bulanIni ? 'tunggak' : 'belum';
+}
+function renderIuran() {
+  const p = S.pub;
+  const months = []; for (let i = 1; i <= 12; i++) months.push(S.year + '-' + String(i).padStart(2, '0'));
+  const shown = months.filter(ym => ym >= p.mulai);
+  const kavs = p.perKavling.filter(k => k.aktif);
+  const khusus = p.khusus || [];
+  $('#tab-iuran').innerHTML = `
+    <div class="card">
+      <h2>Status iuran ${S.year}</h2>
+      <p class="desc">Hijau = uang sudah terlihat di rekening kas. Geser ke samping untuk bulan lain.</p>
+      <div class="scroll-x"><table class="mx"><tr><th></th>${shown.map(ym => `<th>${BULAN[+ym.slice(5) - 1]}</th>`).join('')}</tr>
+      ${kavs.map(k => `<tr><td class="kav">${esc(k.kavling)}<span>${esc(k.nama)}</span></td>${shown.map(ym => {
+        const st = cellState(k.kavling, ym); if (!st) return '<td></td>';
+        const c = CELL[st]; return `<td class="${c.cls}" title="${esc(k.kavling + ' · ' + lb(ym) + ' · ' + c.label)}" aria-label="${esc(lb(ym) + ': ' + c.label)}">${c.sym}</td>`;
+      }).join('')}</tr>`).join('')}</table></div>
+      <div class="mx-legend">${['lunas', 'prepaid', 'klaim', 'tunggak', 'belum'].map(s => `<span><b class="${CELL[s].cls}">${CELL[s].sym}</b>${CELL[s].label}</span>`).join('')}</div>
+    </div>
+
+    <div class="card">
+      <h2>Per kavling</h2>
+      <ul class="list">${kavs.map(k => `<li class="spread"><div><b>${esc(k.kavling)}</b> · ${esc(k.nama)}
+        <div class="small muted">Tarif ${rp(k.tarifSekarang)}/bln · lunas berurutan s/d ${k.lunasSampai ? lb(k.lunasSampai) : '-'}${k.kredit ? ' · kredit ' + rp(k.kredit) : ''}</div>
+        ${k.tunggakan.length ? `<div class="small muted">Belum: ${k.tunggakan.map(t => lbShort(t.bulan)).join(', ')}</div>` : ''}</div>
+        ${k.tunggakan.length ? `<span class="status bad">✗ ${rp(k.totalTunggakan)}</span>` : '<span class="status good">✓ Lunas</span>'}</li>`).join('')}</ul>
+    </div>
+
+    ${khusus.map(kh => {
+      const paid = kh.bayar || {}; const total = Object.values(paid).reduce((a, b) => a + b, 0);
+      return `<div class="card"><h2>${esc(kh.nama)}</h2><p class="desc">${rp(kh.nominal)} per rumah · ${tgl(kh.mulai)}${kh.deadline ? ' s/d ' + tgl(kh.deadline) : ''} · terkumpul ${rp(total)} dari ${Object.keys(paid).length} rumah</p>
+        <div class="chips">${kavs.map(k => `<span class="chip" style="cursor:default">${paid[k.kavling] ? '✓' : '✗'} ${esc(k.kavling)}</span>`).join('')}</div></div>`;
+    }).join('')}`;
+}
+
+// ---------- transaksi ----------
+function renderTransaksi() {
+  if (!S.pub) return;
+  const p = S.pub, f = S.trxFilter;
+  const list = p.mutasi.filter(m => f === 'semua' || (f === 'masuk' && m.jenis === 'CR') || (f === 'keluar' && m.jenis === 'DB') || (f === 'cek' && (m.kelas === 'review' || m.flag)));
+  const filters = { semua: 'Semua', masuk: 'Masuk', keluar: 'Keluar', cek: 'Perlu dicek' };
+  $('#tab-transaksi').innerHTML = `
+    ${p.klaimMenunggu.length ? `<div class="card"><h2>Klaim menunggu statement bank</h2><p class="desc">Akan otomatis dicocokkan saat mutasi bulan ini diupload.</p>
+      <ul class="list">${p.klaimMenunggu.map(k => `<li class="spread"><div>${k.jalur === 'bendahara' ? '<b>Bendahara</b> · ' + esc(k.kategori || k.tipe) : '<b>' + esc(k.kavling) + '</b> · ' + esc(rangeBulan(k.bulan) || k.tipe)}
+        <div class="small muted">${tgl(k.tanggal)}${k.adaBukti ? ' · ada bukti' : ''}</div></div><span class="amt">${rp(k.nominal)}</span></li>`).join('')}</ul></div>` : ''}
+    <div class="chips">${Object.keys(filters).map(k => `<button class="chip ${k === f ? 'on' : ''}" data-f="${k}">${filters[k]}</button>`).join('')}</div>
+    <div class="card"><ul class="list">${list.map(m => `<li data-mid="${esc(m.id)}" ${S.admin ? 'style="cursor:pointer"' : ''}>
+      <div class="spread"><b>${esc(m.pihak || m.kategori || '-')}</b><span class="amt ${m.jenis === 'CR' ? 'in' : ''}">${m.jenis === 'CR' ? '+' : '−'}${rp(m.nominal).replace('Rp ', 'Rp ')}</span></div>
+      <div class="small"><span class="badge ${m.kelas === 'review' || m.flag ? 'flag' : ''}">${esc(KELAS[m.kelas] || m.kelas)}</span>${m.kavling ? esc(m.kavling) + ' · ' : ''}${esc(m.kelas === 'iuran' ? rangeBulan(m.bulan) : (m.kategori !== KELAS[m.kelas] ? m.kategori : ''))}</div>
+      <div class="small muted">${tgl(m.tanggal)}${m.berita ? ' · “' + esc(m.berita) + '”' : ''}${m.cara === 'tag' ? ' · diklasifikasi manual' : ''}</div></li>`).join('') || '<li class="empty">Tidak ada transaksi.</li>'}</ul>
+      ${S.admin ? '<p class="small muted">Mode bendahara: ketuk transaksi untuk mengubah klasifikasinya.</p>' : ''}</div>`;
+  document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.trxFilter = b.dataset.f; renderTransaksi(); });
+  if (S.admin) document.querySelectorAll('[data-mid]').forEach(li => li.onclick = () => openTagEditor(li.dataset.mid));
+}
+
+// ---------- bayar (warga) ----------
+async function renderBayar() {
+  const el = $('#tab-bayar');
+  if (!S.formInfo) {
+    el.innerHTML = '<div class="loading">Memuat form…</div>';
+    try { S.formInfo = JSON.parse(await run('apiFormInfo')); } catch (e) { el.innerHTML = '<div class="err">' + esc(e.message) + '</div>'; return; }
+  }
+  if (!S.form) S.form = { kavling: store.get('kas_kav') || '', tipe: 'iuran', bulan: [], khusus_id: '', nominal: '', manual: false, tanggal: todayIso(), catatan: '', file: null };
+  drawBayar();
+}
+function drawBayar() {
+  const info = S.formInfo, f = S.form, el = $('#tab-bayar');
+  const r = info.rumah.find(x => x.kavling === f.kavling);
+  const lo = addM(info.bulanIni, -11), hi = addM(info.bulanIni, 6);
+  const bulan = r ? r.bulan.filter(b => b.ym >= lo && b.ym <= hi) : [];
+  if (!f.manual) {
+    f.nominal = f.tipe === 'khusus' ? ((info.khusus.find(k => k.id === f.khusus_id) || {}).nominal || '')
+      : f.bulan.reduce((a, ym) => a + ((bulan.find(b => b.ym === ym) || {}).tarif || 0), 0) || '';
+  }
+  el.innerHTML = `<div class="card">
+    <h2>Konfirmasi pembayaran</h2>
+    <p class="desc">Transfer dulu ke ${esc(info.rekeningInfo || 'rekening kas')}, lalu isi form ini. Status jadi ✓ setelah bendahara upload mutasi bank. Kalau lupa isi form pun tetap tercatat dari mutasi, tapi form ini membantu mencocokkan.</p>
+    <label class="f" for="f-kav">Kavling</label>
+    <select id="f-kav"><option value="">— pilih —</option>${info.rumah.map(x => `<option value="${esc(x.kavling)}" ${x.kavling === f.kavling ? 'selected' : ''}>${esc(x.kavling + ' – ' + x.nama)}</option>`).join('')}</select>
+    ${info.khusus.length ? `<label class="f">Jenis</label><div class="seg"><button data-tipe="iuran" class="${f.tipe === 'iuran' ? 'on' : ''}">Iuran bulanan</button><button data-tipe="khusus" class="${f.tipe === 'khusus' ? 'on' : ''}">Iuran khusus</button></div>` : ''}
+    ${f.tipe === 'iuran' ? (r ? `<label class="f">Bulan yang dibayar (boleh lebih dari satu)</label><div class="months">${bulan.map(b => {
+        const paid = b.status === 'lunas' || b.status === 'prepaid';
+        const on = f.bulan.includes(b.ym);
+        return `<label class="${on ? 'on' : ''} ${paid ? 'paid' : ''}"><input type="checkbox" value="${b.ym}" ${on ? 'checked' : ''}>${lbShort(b.ym)}<small>${paid ? 'lunas' : b.status === 'klaim' ? 'diklaim' : rp(b.tarif).replace('Rp ', '')}</small></label>`;
+      }).join('')}</div>` : '<p class="small muted" style="margin-top:10px">Pilih kavling dulu.</p>')
+      : `<label class="f" for="f-kh">Iuran khusus</label><select id="f-kh"><option value="">— pilih —</option>${info.khusus.map(k => `<option value="${esc(k.id)}" ${k.id === f.khusus_id ? 'selected' : ''}>${esc(k.nama)} (${rp(k.nominal)})</option>`).join('')}</select>`}
+    <label class="f" for="f-nom">Nominal yang ditransfer (Rp)</label>
+    <input id="f-nom" type="number" inputmode="numeric" min="1" value="${esc(f.nominal)}">
+    <label class="f" for="f-tgl">Tanggal transfer</label>
+    <input id="f-tgl" type="date" value="${esc(f.tanggal)}" max="${todayIso()}">
+    <label class="f" for="f-file">Bukti transfer (opsional)</label>
+    <input id="f-file" type="file" accept="image/*,application/pdf">
+    <label class="f" for="f-cat">Catatan (opsional)</label>
+    <input id="f-cat" type="text" maxlength="300" value="${esc(f.catatan)}" placeholder="mis. ditransfer dari rekening suami">
+    <div id="f-err" class="err" style="margin-top:8px"></div>
+    <button class="btn block" id="f-kirim" style="margin-top:14px">Kirim konfirmasi</button>
+  </div>`;
+  $('#f-kav').onchange = e => { f.kavling = e.target.value; f.bulan = []; f.manual = false; store.set('kas_kav', f.kavling); drawBayar(); };
+  document.querySelectorAll('[data-tipe]').forEach(b => b.onclick = () => { f.tipe = b.dataset.tipe; f.manual = false; drawBayar(); });
+  if ($('#f-kh')) $('#f-kh').onchange = e => { f.khusus_id = e.target.value; f.manual = false; drawBayar(); };
+  document.querySelectorAll('.months input').forEach(c => c.onchange = () => {
+    f.bulan = c.checked ? [...f.bulan, c.value].sort() : f.bulan.filter(x => x !== c.value); f.manual = false; drawBayar();
+  });
+  $('#f-nom').oninput = e => { f.nominal = e.target.value; f.manual = true; };
+  $('#f-tgl').onchange = e => f.tanggal = e.target.value;
+  $('#f-cat').oninput = e => f.catatan = e.target.value;
+  $('#f-file').onchange = e => f.file = e.target.files[0] || null;
+  $('#f-kirim').onclick = kirimKlaim;
+}
+async function kirimKlaim() {
+  const f = S.form, btn = $('#f-kirim'), err = $('#f-err');
+  err.textContent = '';
+  if (!f.kavling) return err.textContent = 'Pilih kavling.';
+  if (f.tipe === 'iuran' && !f.bulan.length) return err.textContent = 'Centang bulan yang dibayar.';
+  if (f.tipe === 'khusus' && !f.khusus_id) return err.textContent = 'Pilih iuran khusus.';
+  if (!(+f.nominal > 0)) return err.textContent = 'Isi nominal.';
+  btn.disabled = true; btn.textContent = 'Mengirim…';
+  try {
+    const bukti = f.file ? await fileToBase64(f.file) : null;
+    await run('apiSubmitKlaim', { kavling: f.kavling, tipe: f.tipe, bulan: f.bulan, khusus_id: f.khusus_id, nominal: +f.nominal, tanggal: f.tanggal, catatan: f.catatan, bukti });
+    $('#tab-bayar').innerHTML = `<div class="card"><h2>Terima kasih! 🙏</h2><p>Konfirmasi ${esc(f.kavling)} sebesar <b>${rp(f.nominal)}</b>${f.bulan.length ? ' untuk ' + esc(f.bulan.map(lb).join(', ')) : ''} sudah tercatat.</p>
+      <p class="small muted">Statusnya “menunggu” sampai bendahara mengupload mutasi bank bulan ini, lalu otomatis jadi ✓.</p>
+      <button class="btn ghost" id="f-lagi">Isi lagi</button></div>`;
+    S.form = null; S.formInfo = null;
+    $('#f-lagi').onclick = renderBayar;
+    loadPublic().catch(() => {});
+  } catch (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Kirim konfirmasi'; }
+}
+
+// ---------- bendahara ----------
+function renderBendahara() {
+  const el = $('#tab-bendahara');
+  if (!S.token) {
+    el.innerHTML = `<div class="card"><h2>Masuk sebagai bendahara</h2><p class="desc">Menu ini untuk input pengeluaran, upload mutasi, dan review. Warga cukup memakai tab lain.</p>
+      <label class="f" for="pin">PIN</label><input id="pin" type="password" inputmode="numeric" autocomplete="current-password">
+      <div id="pin-err" class="err" style="margin-top:6px"></div>
+      <button class="btn block" id="pin-ok" style="margin-top:12px">Masuk</button></div>`;
+    const go = async () => {
+      const b = $('#pin-ok'); b.disabled = true;
+      try { S.token = await run('apiLogin', $('#pin').value); store.set('kas_token', S.token); await loadAdmin(); }
+      catch (e) { $('#pin-err').textContent = e.message; b.disabled = false; }
+    };
+    $('#pin-ok').onclick = go; $('#pin').onkeydown = e => { if (e.key === 'Enter') go(); };
+    return;
+  }
+  if (!S.admin) { el.innerHTML = '<div class="loading">Memuat data bendahara…</div>'; loadAdmin(); return; }
+  drawAdmin();
+}
+async function loadAdmin() {
+  try {
+    S.admin = JSON.parse(await run('apiAdmin', S.token));
+    drawAdmin(); renderTransaksi();
+  } catch (e) {
+    S.token = null; S.admin = null; store.set('kas_token', null); fail(e); renderBendahara();
+  }
+}
+async function refreshAll(msg) {
+  if (msg) toast(msg);
+  S.formInfo = null;
+  await Promise.all([loadPublic(), S.token ? loadAdmin() : null]);
+}
+function drawAdmin() {
+  const a = S.admin;
+  const tabs = { review: 'Review' + (a.review.length ? ' (' + a.review.length + ')' : ''), input: 'Input', import: 'Import mutasi', reminder: 'Reminder', laporan: 'Laporan', atur: 'Pengaturan' };
+  $('#tab-bendahara').innerHTML = `<div class="chips">${Object.keys(tabs).map(k => `<button class="chip ${k === S.adminTab ? 'on' : ''}" data-at="${k}">${tabs[k]}</button>`).join('')}</div><div id="admin-body"></div>`;
+  document.querySelectorAll('[data-at]').forEach(b => b.onclick = () => { S.adminTab = b.dataset.at; drawAdmin(); });
+  ({ review: adminReview, input: adminInput, import: adminImport, reminder: adminReminder, laporan: adminLaporan, atur: adminAtur })[S.adminTab]();
+}
+
+function adminReview() {
+  const a = S.admin;
+  const warga = a.klaim.filter(k => k.jalur === 'warga').slice(0, 30);
+  $('#admin-body').innerHTML = `
+    <div class="card"><h2>Perlu dicek</h2><p class="desc">Transaksi yang belum bisa diklasifikasi otomatis, nominal yang tidak pas, atau klaim yang tidak ada di bank.</p>
+    <ul class="list">${a.review.map((v, i) => `<li>
+      <div class="spread"><b>${esc(v.pihak || v.kavling || v.keterangan || '-')}</b><span class="amt ${v.arah === 'CR' ? 'in' : ''}">${v.jenis === 'mutasi' ? (v.arah === 'CR' ? '+' : '−') : ''}${rp(v.nominal)}</span></div>
+      <div class="small">${esc(v.alasan)}</div>
+      <div class="small muted">${tgl(v.tanggal)}${v.berita ? ' · “' + esc(v.berita) + '”' : ''}${v.saran && (v.saran.kavling || v.saran.bulan.length) ? ' · saran: ' + esc([v.saran.kavling, rangeBulan(v.saran.bulan)].filter(Boolean).join(' ')) : ''}</div>
+      <div class="row" style="margin-top:6px">${v.jenis === 'mutasi' ? `<button class="btn ghost" data-rv="${i}">Klasifikasikan</button>` : `<button class="btn danger" data-hk="${esc(v.id)}">Hapus klaim</button>`}</div>
+    </li>`).join('') || '<li class="empty">Semua beres ✓</li>'}</ul></div>
+
+    <div class="card"><h2>Klaim warga terbaru</h2><ul class="list">${warga.map(k => `<li><div class="spread"><b>${esc(k.kavling)}</b><span class="amt">${rp(k.nominal)}</span></div>
+      <div class="small">${esc(k.tipe === 'iuran' ? rangeBulan(k.bulan) : k.tipe)} · <span class="badge ${k.status === 'tidak_ditemukan' ? 'flag' : ''}">${esc(k.status.replace('_', ' '))}</span>${k.bukti ? ` · <a href="${esc(k.bukti)}" target="_blank" rel="noopener">bukti</a>` : ''}</div>
+      <div class="small muted">transfer ${tgl(k.tanggal)} · dikirim ${esc(k.waktu)}${k.catatan ? ' · ' + esc(k.catatan) : ''}</div></li>`).join('') || '<li class="empty">Belum ada.</li>'}</ul></div>`;
+  document.querySelectorAll('[data-rv]').forEach(b => b.onclick = () => openTagEditor(a.review[+b.dataset.rv].id));
+  document.querySelectorAll('[data-hk]').forEach(b => b.onclick = async () => {
+    if (!confirm('Hapus klaim ini? (bisa dikembalikan dari tab Klaim di spreadsheet)')) return;
+    try { await run('apiHapusKlaim', S.token, b.dataset.hk); await refreshAll('Klaim dihapus'); } catch (e) { fail(e); }
+  });
+}
+
+function openTagEditor(mid) {
+  const a = S.admin;
+  const m = S.pub.mutasi.find(x => x.id === mid); if (!m) return;
+  const rv = a.review.find(x => x.id === mid) || {};
+  const tag = a.tags[mid] || {};
+  const saran = rv.saran || {};
+  const defTipe = tag.tipe || (m.kelas !== 'review' && m.kelas !== 'biaya_bank' && m.kelas !== 'bunga' ? m.kelas : (m.jenis === 'DB' ? 'pengeluaran' : (saran.khusus_id ? 'khusus' : 'iuran')));
+  const st = { tipe: defTipe, kavling: tag.kavling || m.kavling || saran.kavling || '', bulan: (tag.bulan && tag.bulan.length ? tag.bulan : (m.kelas === 'iuran' ? m.bulan : saran.bulan || [])).slice(),
+    kategori: tag.kategori || (m.kelas === 'pengeluaran' ? m.kategori : '') || 'Lain-lain', khusus_id: tag.khusus_id || saran.khusus_id || '', catatan: tag.catatan || '', simpan: m.jenis === 'CR' && !!m.pihak };
+  const base = m.tanggal.slice(0, 7);
+  const months = []; for (let i = -6; i <= 13; i++) months.push(addM(base, i));
+  const tipeOpts = m.jenis === 'CR'
+    ? { iuran: 'Iuran bulanan', khusus: 'Iuran khusus', tombokan: 'Tombokan bendahara (jadi utang kas)', pemasukan_lain: 'Pemasukan lain', abaikan: 'Abaikan' }
+    : { pengeluaran: 'Pengeluaran', pelunasan: 'Pelunasan utang ke bendahara', abaikan: 'Abaikan' };
+  function draw() {
+    modal(`<h2>${m.jenis === 'CR' ? '+' : '−'}${rp(m.nominal)} · ${esc(m.pihak || m.kategori || '')}</h2>
+      <p class="desc">${tgl(m.tanggal)}${m.berita ? ' · “' + esc(m.berita) + '”' : ''}</p>
+      <label class="f">Jenis</label><select id="t-tipe">${Object.keys(tipeOpts).map(k => `<option value="${k}" ${k === st.tipe ? 'selected' : ''}>${tipeOpts[k]}</option>`).join('')}</select>
+      ${st.tipe === 'iuran' || st.tipe === 'khusus' ? `<label class="f">Kavling</label><select id="t-kav"><option value="">—</option>${a.rumah.map(r => `<option value="${esc(r.kavling)}" ${r.kavling === st.kavling ? 'selected' : ''}>${esc(r.kavling + ' – ' + r.nama)}</option>`).join('')}</select>` : ''}
+      ${st.tipe === 'iuran' ? `<label class="f">Bulan (kosongkan = otomatis ke bulan tertunggak paling lama)</label><div class="months">${months.map(ym => `<label class="${st.bulan.includes(ym) ? 'on' : ''}"><input type="checkbox" value="${ym}" ${st.bulan.includes(ym) ? 'checked' : ''}>${lbShort(ym)}</label>`).join('')}</div>` : ''}
+      ${st.tipe === 'khusus' ? `<label class="f">Iuran khusus</label><select id="t-kh">${S.pub.khusus.map(k => `<option value="${esc(k.id)}" ${k.id === st.khusus_id ? 'selected' : ''}>${esc(k.nama)}</option>`).join('')}</select>` : ''}
+      ${st.tipe === 'pengeluaran' ? `<label class="f">Kategori</label><select id="t-kat">${a.kategori.map(k => `<option ${k === st.kategori ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>` : ''}
+      <label class="f">Catatan</label><input id="t-cat" type="text" value="${esc(st.catatan)}">
+      ${(st.tipe === 'iuran' || st.tipe === 'khusus') && m.jenis === 'CR' && m.pihak ? `<label class="row small" style="margin-top:10px"><input type="checkbox" id="t-simpan" ${st.simpan ? 'checked' : ''} style="width:auto;min-height:0"> Ingat “${esc(m.pihak)}” sebagai rekening kavling ini (transfer berikutnya otomatis)</label>` : ''}
+      <div class="row" style="margin-top:14px"><button class="btn" id="t-ok">Simpan</button>${a.tags[mid] ? '<button class="btn danger" id="t-del">Hapus tag</button>' : ''}<button class="btn ghost" onclick="closeModal()">Batal</button></div>`);
+    $('#t-tipe').onchange = e => { st.tipe = e.target.value; draw(); };
+    if ($('#t-kav')) $('#t-kav').onchange = e => st.kavling = e.target.value;
+    if ($('#t-kh')) { st.khusus_id = $('#t-kh').value; $('#t-kh').onchange = e => st.khusus_id = e.target.value; }
+    if ($('#t-kat')) $('#t-kat').onchange = e => st.kategori = e.target.value;
+    $('#t-cat').oninput = e => st.catatan = e.target.value;
+    if ($('#t-simpan')) $('#t-simpan').onchange = e => st.simpan = e.target.checked;
+    document.querySelectorAll('.modal .months input').forEach(c => c.onchange = () => {
+      st.bulan = c.checked ? [...st.bulan, c.value].sort() : st.bulan.filter(x => x !== c.value); draw();
+    });
+    $('#t-ok').onclick = async () => {
+      if (st.tipe === 'iuran' && !st.kavling) return toast('Pilih kavling.');
+      const b = $('#t-ok'); b.disabled = true;
+      try {
+        await run('apiTag', S.token, { mutasi_id: mid, tipe: st.tipe, kavling: st.kavling, bulan: st.tipe === 'iuran' ? st.bulan : [],
+          kategori: st.tipe === 'pengeluaran' ? st.kategori : '', khusus_id: st.tipe === 'khusus' ? st.khusus_id : '', catatan: st.catatan },
+          { simpanRekening: !!(st.simpan && $('#t-simpan')), pihak: m.pihak });
+        closeModal(); await refreshAll('Tersimpan');
+      } catch (e) { fail(e); b.disabled = false; }
+    };
+    if ($('#t-del')) $('#t-del').onclick = async () => { try { await run('apiHapusTag', S.token, mid); closeModal(); await refreshAll('Tag dihapus'); } catch (e) { fail(e); } };
+  }
+  draw();
+}
+
+function adminInput() {
+  const a = S.admin;
+  const st = S.inputForm || (S.inputForm = { tipe: 'pengeluaran', kategori: 'Sampah', penerima: '', nominal: '', tanggal: todayIso(), sumber_dana: 'kas', catatan: '', file: null });
+  const mine = a.klaim.filter(k => k.jalur === 'bendahara').slice(0, 30);
+  $('#admin-body').innerHTML = `<div class="card"><h2>Input bendahara</h2>
+    <p class="desc">Pengeluaran yang sudah dibayar, tombokan uang pribadi ke kas, atau pengembalian tombokan. Akan dicocokkan ke mutasi bank otomatis.</p>
+    <div class="seg">${[['pengeluaran', 'Pengeluaran'], ['tombokan', 'Tombokan'], ['pelunasan', 'Pelunasan utang']].map(x => `<button data-it="${x[0]}" class="${st.tipe === x[0] ? 'on' : ''}">${x[1]}</button>`).join('')}</div>
+    ${st.tipe === 'pengeluaran' ? `<label class="f">Kategori</label><select id="i-kat">${a.kategori.map(k => `<option ${k === st.kategori ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
+      <label class="f">Penerima</label><input id="i-pen" type="text" value="${esc(st.penerima)}" placeholder="mis. Pak Mahmud">
+      <label class="f">Dibayar dari</label><div class="seg"><button data-sd="kas" class="${st.sumber_dana === 'kas' ? 'on' : ''}">Rekening kas</button><button data-sd="pribadi" class="${st.sumber_dana === 'pribadi' ? 'on' : ''}">Uang pribadi (jadi utang kas)</button></div>` : ''}
+    <label class="f">Nominal (Rp, tanpa biaya transfer)</label><input id="i-nom" type="number" inputmode="numeric" value="${esc(st.nominal)}">
+    <label class="f">Tanggal</label><input id="i-tgl" type="date" value="${esc(st.tanggal)}">
+    <label class="f">Bukti (opsional)</label><input id="i-file" type="file" accept="image/*,application/pdf">
+    <label class="f">Catatan</label><input id="i-cat" type="text" value="${esc(st.catatan)}">
+    <button class="btn block" id="i-ok" style="margin-top:14px">Simpan</button></div>
+    <div class="card"><h2>Input terakhir</h2><ul class="list">${mine.map(k => `<li><div class="spread"><b>${esc(k.kategori || k.tipe)}</b><span class="amt">${rp(k.nominal)}</span></div>
+      <div class="small">${tgl(k.tanggal)} · <span class="badge ${k.status === 'tidak_ditemukan' ? 'flag' : ''}">${esc(k.status.replace('_', ' '))}</span>${k.sumber_dana === 'pribadi' ? ' · uang pribadi' : ''}${k.bukti ? ` · <a href="${esc(k.bukti)}" target="_blank" rel="noopener">bukti</a>` : ''}</div>
+      <div class="row" style="margin-top:4px"><button class="linkbtn" data-hk="${esc(k.id)}">Hapus</button></div></li>`).join('') || '<li class="empty">Belum ada.</li>'}</ul></div>`;
+  document.querySelectorAll('[data-it]').forEach(b => b.onclick = () => { st.tipe = b.dataset.it; adminInput(); });
+  document.querySelectorAll('[data-sd]').forEach(b => b.onclick = () => { st.sumber_dana = b.dataset.sd; adminInput(); });
+  if ($('#i-kat')) $('#i-kat').onchange = e => st.kategori = e.target.value;
+  if ($('#i-pen')) $('#i-pen').oninput = e => st.penerima = e.target.value;
+  $('#i-nom').oninput = e => st.nominal = e.target.value;
+  $('#i-tgl').onchange = e => st.tanggal = e.target.value;
+  $('#i-cat').oninput = e => st.catatan = e.target.value;
+  $('#i-file').onchange = e => st.file = e.target.files[0] || null;
+  $('#i-ok').onclick = async () => {
+    const b = $('#i-ok'); b.disabled = true;
+    try {
+      const bukti = st.file ? await fileToBase64(st.file) : null;
+      await run('apiSubmitBendahara', S.token, { tipe: st.tipe, kategori: st.kategori, penerima: st.penerima, nominal: +st.nominal,
+        tanggal: st.tanggal, sumber_dana: st.sumber_dana, catatan: st.catatan, bukti: bukti });
+      S.inputForm = null; await refreshAll('Tersimpan');
+    } catch (e) { fail(e); b.disabled = false; }
+  };
+  document.querySelectorAll('[data-hk]').forEach(b => b.onclick = async () => {
+    if (!confirm('Hapus input ini?')) return;
+    try { await run('apiHapusKlaim', S.token, b.dataset.hk); await refreshAll('Dihapus'); } catch (e) { fail(e); }
+  });
+}
+
+function adminImport() {
+  const a = S.admin;
+  $('#admin-body').innerHTML = `
+    <div class="card"><h2>A. Upload PDF e-Statement</h2>
+      <p class="desc">Claude membaca PDF lalu kamu cek hasilnya sebelum disimpan. Statement yang saldonya tidak cocok otomatis ditolak.${a.adaApiKey ? '' : ' <b>API key belum disimpan</b> (menu Kas Eunoia di spreadsheet).'}</p>
+      <input id="imp-pdf" type="file" accept="application/pdf">
+      <button class="btn block" id="imp-pdf-ok" style="margin-top:10px" ${a.adaApiKey ? '' : 'disabled'}>Baca dengan Claude</button></div>
+    <div class="card"><h2>B. Tempel JSON dari Claude</h2>
+      <p class="desc">Kirim PDF ke Claude di chat, minta format import Kas Eunoia, lalu tempel hasilnya di sini.</p>
+      <textarea id="imp-json" placeholder='{"statements":[...]}'></textarea>
+      <button class="btn ghost block" id="imp-json-ok" style="margin-top:10px">Cek JSON</button></div>
+    <div id="imp-preview"></div>`;
+  $('#imp-pdf-ok').onclick = async () => {
+    const f = $('#imp-pdf').files[0]; if (!f) return toast('Pilih file PDF dulu.');
+    const b = $('#imp-pdf-ok'); b.disabled = true; b.textContent = 'Claude sedang membaca… (±1 menit)';
+    try { showPreview(JSON.parse(await run('apiImportPdf', S.token, await fileToBase64(f)))); }
+    catch (e) { fail(e); } finally { b.disabled = false; b.textContent = 'Baca dengan Claude'; }
+  };
+  $('#imp-json-ok').onclick = async () => {
+    try { showPreview(JSON.parse(await run('apiImportJson', S.token, $('#imp-json').value))); } catch (e) { fail(e); }
+  };
+}
+function showPreview(res) {
+  const ok = res.preview.every(p => !p.errors.length);
+  $('#imp-preview').innerHTML = `<div class="card"><h2>Cek sebelum simpan</h2>
+    ${res.preview.map(p => `<div style="margin:8px 0 12px"><div class="spread"><b>${lb(p.periode)}</b><span class="small">${p.jumlah} transaksi</span></div>
+      <div class="small tnum">Saldo ${rp(p.saldo_awal)} → ${rp(p.saldo_akhir)} · masuk ${rp(p.total_cr)} · keluar ${rp(p.total_db)}</div>
+      ${p.errors.map(e => `<div class="err">✗ ${esc(e)}</div>`).join('')}${p.warnings.map(w => `<div class="small">⚠ ${esc(w)}</div>`).join('')}
+      ${!p.errors.length ? '<div class="small" style="color:var(--good-ink)">✓ Saldo cocok dengan ringkasan BCA</div>' : ''}
+      <details><summary class="small">Lihat transaksi</summary><div class="scroll-x"><table class="data">${(p.transaksi || []).map(t => `<tr><td>${t.tanggal.slice(8)}</td><td>${esc(t.pihak || t.keterangan)}<div class="small muted">${esc(t.berita)}</div></td><td class="n">${t.jenis === 'DB' ? '−' : '+'}${rp(t.nominal)}</td></tr>`).join('')}</table></div></details></div>`).join('')}
+    ${res.extra && (res.extra.rumah || res.extra.tags) ? `<p class="small muted">Termasuk ${res.extra.rumah} data rumah & ${res.extra.tags} klasifikasi manual.</p>` : ''}
+    <button class="btn block" id="imp-commit" ${ok ? '' : 'disabled'}>${ok ? 'Simpan ke kas' : 'Ada error — tidak bisa disimpan'}</button></div>`;
+  $('#imp-commit').onclick = async () => {
+    const b = $('#imp-commit'); b.disabled = true; b.textContent = 'Menyimpan…';
+    try { const r = await run('apiCommitImport', S.token, res.key); $('#imp-preview').innerHTML = ''; await refreshAll(r.pesan); } catch (e) { fail(e); b.disabled = false; }
+  };
+  $('#imp-preview').scrollIntoView({ behavior: 'smooth' });
+}
+
+function adminReminder() {
+  const a = S.admin;
+  const perlu = a.reminderWarga.filter(x => x.perlu), aman = a.reminderWarga.filter(x => !x.perlu);
+  $('#admin-body').innerHTML = `
+    <div class="card"><h2>Pengeluaran rutin</h2><p class="desc">Email ke ${esc(a.settings.EMAIL_BENDAHARA || 'bendahara')} H-2 lalu tiap hari sejak tanggal jatuh tempo sampai terbayar.</p>
+      <ul class="list">${a.expected.map(e => `<li class="spread"><div><b>${esc(e.nama)}</b><div class="small muted">${e.terbayar}/${e.jatuhTempo} bulan terbayar sejak mulai</div></div>
+      ${e.lunasBulanIni ? '<span class="status good">✓ Aman</span>' : `<span class="status bad">✗ Kurang ${-e.selisih} bln</span>`}</li>`).join('')}</ul></div>
+    <div class="card"><h2>Reminder warga (${perlu.length})</h2><p class="desc">Belum lunas s/d ${lb(addM(S.pub.bulanIni, 1))}. Tombol membuka WhatsApp dengan pesan terisi${perlu.some(x => !x.wa) ? '; kavling tanpa nomor WA akan minta pilih kontak' : ''}. Email daftar ini dikirim otomatis tiap tgl ${esc(a.settings.TGL_REMINDER_WARGA || 27)}.</p>
+      <ul class="list">${perlu.map((x, i) => `<li><div class="spread"><div><b>${esc(x.kavling)}</b> · ${esc(x.nama)}<div class="small muted">${esc(x.bulan.map(lbShort).join(', '))}</div></div><span class="amt">${rp(x.total)}</span></div>
+        <div class="row" style="margin-top:6px"><a class="btn" href="${esc(x.link)}" target="_blank" rel="noopener">Kirim WA</a><button class="btn ghost" data-cp="${i}">Salin pesan</button></div></li>`).join('') || '<li class="empty">Semua lunas 🎉</li>'}</ul>
+      ${aman.length ? `<p class="small muted">Sudah aman: ${esc(aman.map(x => x.kavling).join(', '))}</p>` : ''}</div>`;
+  document.querySelectorAll('[data-cp]').forEach(b => b.onclick = () => copyText(perlu[+b.dataset.cp].pesan));
+}
+
+function adminLaporan() {
+  const months = S.pub.cashflow.map(c => c.bulan).reverse();
+  $('#admin-body').innerHTML = `<div class="card"><h2>Laporan</h2>
+    <label class="f">Bulan</label><select id="l-bulan">${months.map(ym => `<option value="${ym}">${lb(ym)}</option>`).join('')}</select>
+    <div class="row" style="margin-top:12px"><button class="btn" id="l-wa">Salin teks WA</button><button class="btn ghost" id="l-pdf">PDF bulanan</button><button class="btn ghost" id="l-st">PDF serah terima (tahunan)</button></div>
+    <div id="l-out" style="margin-top:12px"></div>
+    <p class="small muted">PDF disimpan di folder Drive kas dan bisa dibuka siapa pun yang punya link.</p></div>`;
+  $('#l-wa').onclick = async () => { try { copyText(await run('apiLaporanWa', $('#l-bulan').value)); } catch (e) { fail(e); } };
+  const pdf = jenis => async e => {
+    const b = e.target; b.disabled = true; $('#l-out').innerHTML = '<span class="small muted">Membuat PDF…</span>';
+    try { const r = await run('apiLaporanPdf', S.token, $('#l-bulan').value, jenis); $('#l-out').innerHTML = `<a class="btn ghost" href="${esc(r.url)}" target="_blank" rel="noopener">Buka ${esc(r.nama)}</a>`; }
+    catch (err) { fail(err); $('#l-out').innerHTML = ''; } finally { b.disabled = false; }
+  };
+  $('#l-pdf').onclick = pdf('bulanan'); $('#l-st').onclick = pdf('serahterima');
+}
+
+function adminAtur() {
+  const a = S.admin, s = a.settings;
+  $('#admin-body').innerHTML = `
+    <div class="card"><h2>Umum</h2>
+      ${[['REKENING_INFO', 'Rekening tujuan (tampil ke warga)'], ['NAMA_BENDAHARA', 'Nama bendahara'], ['EMAIL_BENDAHARA', 'Email reminder'],
+        ['NAMA_REKENING_BENDAHARA', 'Nama rekening pribadi bendahara di mutasi (18 huruf)'], ['TGL_REMINDER_WARGA', 'Tanggal reminder warga']]
+        .map(x => `<label class="f">${x[1]}</label><input type="text" data-set="${x[0]}" value="${esc(s[x[0]] || '')}">`).join('')}
+      <button class="btn" id="s-ok" style="margin-top:12px">Simpan</button></div>
+    <div class="card"><h2>Rumah & rekening</h2><p class="desc">Nama rekening dipisah titik koma, persis seperti di mutasi (mis. RACHDIAZ JUDHA DAR). Nomor WA format 62…</p>
+      ${a.rumah.map((r, i) => `<details style="margin:6px 0"><summary><b>${esc(r.kavling)}</b> · ${esc(r.nama)}</summary>
+        <label class="f">Nama</label><input type="text" id="r-nama-${i}" value="${esc(r.nama)}">
+        <label class="f">Nama rekening</label><input type="text" id="r-rek-${i}" value="${esc((r.rekening || []).join('; '))}">
+        <label class="f">WhatsApp</label><input type="text" id="r-wa-${i}" inputmode="tel" value="${esc(r.wa)}">
+        <button class="btn ghost" data-rs="${i}" style="margin-top:8px">Simpan ${esc(r.kavling)}</button></details>`).join('')}</div>
+    <div class="card"><h2>Iuran khusus</h2><ul class="list">${S.pub.khusus.map(k => `<li class="spread"><div><b>${esc(k.nama)}</b><div class="small muted">${rp(k.nominal)}/rumah · ${tgl(k.mulai)}${k.deadline ? '–' + tgl(k.deadline) : ''}</div></div>
+      <button class="linkbtn" data-kh="${esc(k.id)}">${k.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button></li>`).join('') || '<li class="empty">Belum ada.</li>'}</ul>
+      <label class="f">Nama</label><input type="text" id="k-nama" placeholder="mis. Iuran 17 Agustus 2027">
+      <div class="row"><div style="flex:1"><label class="f">Nominal/rumah</label><input type="number" id="k-nom"></div></div>
+      <div class="row"><div style="flex:1"><label class="f">Mulai</label><input type="date" id="k-mulai"></div><div style="flex:1"><label class="f">Deadline</label><input type="date" id="k-dl"></div></div>
+      <button class="btn ghost" id="k-ok" style="margin-top:10px">Buat iuran khusus</button></div>
+    <div class="card"><h2>PIN</h2>
+      <label class="f">PIN lama</label><input type="password" id="p-lama" inputmode="numeric">
+      <label class="f">PIN baru (4–8 digit)</label><input type="password" id="p-baru" inputmode="numeric">
+      <div class="row" style="margin-top:10px"><button class="btn ghost" id="p-ok">Ganti PIN</button><button class="btn danger" id="logout">Keluar</button></div></div>`;
+  $('#s-ok').onclick = async () => {
+    const o = {}; document.querySelectorAll('[data-set]').forEach(i => o[i.dataset.set] = i.value);
+    try { await run('apiSimpanSettings', S.token, o); await refreshAll('Pengaturan tersimpan'); } catch (e) { fail(e); }
+  };
+  document.querySelectorAll('[data-rs]').forEach(b => b.onclick = async () => {
+    const i = +b.dataset.rs, r = a.rumah[i];
+    try { await run('apiSimpanRumah', S.token, { kavling: r.kavling, nama: $('#r-nama-' + i).value, rekening: $('#r-rek-' + i).value, wa: $('#r-wa-' + i).value }); await refreshAll(r.kavling + ' tersimpan'); } catch (e) { fail(e); }
+  });
+  document.querySelectorAll('[data-kh]').forEach(b => b.onclick = async () => {
+    const k = S.pub.khusus.find(x => x.id === b.dataset.kh);
+    try { await run('apiSimpanKhusus', S.token, Object.assign({}, k, { aktif: !k.aktif })); await refreshAll('Tersimpan'); } catch (e) { fail(e); }
+  });
+  $('#k-ok').onclick = async () => {
+    try { await run('apiSimpanKhusus', S.token, { nama: $('#k-nama').value, nominal: +$('#k-nom').value, mulai: $('#k-mulai').value, deadline: $('#k-dl').value }); await refreshAll('Iuran khusus dibuat'); } catch (e) { fail(e); }
+  };
+  $('#p-ok').onclick = async () => { try { await run('apiGantiPin', S.token, $('#p-lama').value, $('#p-baru').value); toast('PIN diganti'); } catch (e) { fail(e); } };
+  $('#logout').onclick = () => { S.token = null; S.admin = null; store.set('kas_token', null); renderBendahara(); renderTransaksi(); };
+}
+
+// ---------- mulai ----------
+loadPublic()
+  .then(() => { if (S.token) loadAdmin(); })
+  .catch(e => { $('#tab-ringkasan').innerHTML = '<div class="card err">Gagal memuat: ' + esc(e.message) + '</div>'; });
+</script>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><?= namaKas ?></title>
+  <?!= include('Css'); ?>
+</head>
+<body>
+  <header class="top">
+    <h1 id="judul"><?= namaKas ?></h1>
+    <div class="sub" id="subjudul">Memuat…</div>
+  </header>
+
+  <main>
+    <section class="tab on" id="tab-ringkasan"><div class="loading">Memuat data kas…</div></section>
+    <section class="tab" id="tab-iuran"></section>
+    <section class="tab" id="tab-transaksi"></section>
+    <section class="tab" id="tab-bayar"></section>
+    <section class="tab" id="tab-bendahara"></section>
+  </main>
+
+  <nav class="bottom" aria-label="Menu">
+    <button data-tab="ringkasan" class="on"><span class="ico">⌂</span>Ringkasan</button>
+    <button data-tab="iuran"><span class="ico">▦</span>Iuran</button>
+    <button data-tab="transaksi"><span class="ico">⇅</span>Transaksi</button>
+    <button data-tab="bayar"><span class="ico">＋</span>Bayar</button>
+    <button data-tab="bendahara"><span class="ico">⚿</span>Bendahara</button>
+  </nav>
+
+  <div class="toast" id="toast" role="status"></div>
+  <div class="modal-bg" id="modal"><div class="modal" id="modal-body"></div></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <?!= include('App'); ?>
+</body>
+</html>
