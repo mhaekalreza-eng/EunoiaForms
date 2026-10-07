@@ -227,8 +227,6 @@ a.btn { text-decoration: none; }
 .hero-wrap::after { bottom: -220px; right: -160px; background: radial-gradient(circle, color-mix(in srgb, var(--lime) 35%, transparent) 0%, transparent 65%); animation: drift 22s ease-in-out infinite alternate-reverse; }
 @keyframes drift { from { transform: translate(0, 0) scale(1); } to { transform: translate(60px, 40px) scale(1.12); } }
 
-.lead { display: grid; gap: 18px; align-items: center; }
-@media (min-width: 720px) { .lead { grid-template-columns: 1.05fr 1fr; gap: 28px; } }
 .hero-copy { min-width: 0; }
 .eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
 .hero-copy h1 { font-size: clamp(30px, 7vw, 44px); line-height: 1.05; margin: 6px 0 10px; font-weight: 800; letter-spacing: -0.02em; }
@@ -240,67 +238,12 @@ a.btn { text-decoration: none; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .btn-ghost-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 6px; font-weight: 600; text-decoration: none; }
 
-.hero-media { position: relative; min-width: 0; padding-bottom: 54px; }
-.hero-img {
-  position: relative; border-radius: 22px; overflow: hidden; aspect-ratio: 4 / 3; max-width: 100%;
-  background: linear-gradient(140deg, var(--hero-a), var(--hero-b) 55%, var(--hero-c));
-  box-shadow: var(--shadow);
-}
-.hero-img .ph {
-  position: absolute; inset: -8% 0; background-size: cover; background-position: center;
-  will-change: transform;
-}
-.hero-img .credit { position: absolute; right: 10px; top: 10px; font-size: 10.5px; color: #fff; background: rgba(0,0,0,.35); padding: 2px 7px; border-radius: 999px; }
-.hero-img .leaf { position: absolute; left: 14px; top: 14px; width: 54px; height: 54px; opacity: .9; }
-
-/* kartu rekening yang melayang di sudut foto */
-.card.rek {
-  position: absolute; left: 12px; right: 12px; bottom: 0; margin: 0; text-align: left;
-  box-shadow: var(--shadow); padding: 14px 16px;
-}
-@media (min-width: 720px) { .card.rek { left: -26px; right: auto; width: min(330px, 92%); } }
+/* kartu rekening di bawah penjelasan */
+.card.rek { margin: 0 0 10px; padding: 14px 16px; box-shadow: var(--shadow); max-width: 420px; }
 .rek-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .rek-bank { font-weight: 800; font-size: 14px; color: var(--accent); letter-spacing: .04em; margin: 0; }
 .rek-no { font: 800 30px/1.1 var(--font-display); letter-spacing: .02em; margin: 2px 0; user-select: all; -webkit-user-select: all; font-variant-numeric: tabular-nums; }
 .rek .btn { min-height: 40px; padding: 8px 14px; }
-
-/* tombol utama: denyut, kilau, percikan saat hover */
-.btn.cta { position: relative; overflow: hidden; animation: pulse 2.8s ease-in-out infinite; }
-.btn.cta::before {
-  content: ""; position: absolute; top: 0; bottom: 0; left: -60%; width: 40%;
-  background: linear-gradient(100deg, transparent, rgba(255,255,255,.45), transparent);
-  transform: skewX(-18deg) translateX(0); animation: shine 4.2s ease-in-out infinite;
-}
-.btn.cta::after {
-  content: "✦"; position: absolute; right: 10px; top: 4px; font-size: 13px; color: var(--lime);
-  opacity: 0; transform: scale(.4) rotate(-30deg); transition: opacity .25s, transform .35s;
-}
-.btn.cta:hover::after, .btn.cta:focus-visible::after { opacity: 1; transform: scale(1) rotate(0); }
-@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 50% { box-shadow: 0 0 0 8px transparent; } }
-@keyframes shine { 0%, 60% { transform: skewX(-18deg) translateX(0); } 100% { transform: skewX(-18deg) translateX(420%); } }
-
-/* angka statistik */
-.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 4px 0 12px; }
-@media (max-width: 460px) { .stats { grid-template-columns: 1fr 1fr; } .stats .stat:last-child { grid-column: span 2; } }
-.stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; min-width: 0; }
-.stat .ic { width: 26px; height: 26px; color: var(--accent); animation: bob 3.2s ease-in-out infinite; display: block; }
-.stat:nth-child(2) .ic { animation-delay: .5s; } .stat:nth-child(3) .ic { animation-delay: 1s; }
-@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-.stat .num { font: 800 20px/1.15 var(--font-display); margin-top: 6px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.stat .lbl { font-size: 12px; color: var(--ink-2); }
-
-/* kartu tarif: "bernapas" dan centang yang tergambar */
-.tarif { border-color: color-mix(in srgb, var(--accent) 35%, transparent); animation: breathe 6s ease-in-out infinite; }
-@keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.012); } }
-.tarif .harga { font: 800 28px/1.1 var(--font-display); margin: 4px 0 2px; }
-.tarif .harga small { font: 600 14px var(--font-body); color: var(--ink-2); }
-.checks { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
-.checks li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; }
-.checks svg { width: 22px; height: 22px; }
-.checks circle { fill: color-mix(in srgb, var(--accent) 14%, transparent); }
-.checks path { fill: none; stroke: var(--accent); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 20; stroke-dashoffset: 0; animation: draw-check .5s ease-out both; }
-.checks li:nth-child(2) path { animation-delay: .15s; } .checks li:nth-child(3) path { animation-delay: .3s; } .checks li:nth-child(4) path { animation-delay: .45s; }
-@keyframes draw-check { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
 
 /* kartu yang bisa disentuh: terangkat saat hover */
 .lift { transition: transform .2s ease, box-shadow .2s ease; }

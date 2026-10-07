@@ -652,38 +652,18 @@ setTimeout(() => {
   $('#tab-ringkasan').insertAdjacentHTML('beforeend', '<div class="note" style="margin-top:12px">Masih memuat? Kalau browser ini login ke lebih dari satu akun Google, ' +
     'buka link ini di jendela Incognito/Private atau logout akun lain dulu. Kalau masih gagal, bendahara bisa cek menu Executions di Apps Script.</div>');
 }, 15000);
-// ---------- gerak halus: progres scroll, parallax foto, hitung naik, salin, link tab ----------
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// ---------- progres scroll, tombol salin, link antar-tab ----------
 (function motion() {
   const bar = $('#progress');
-  const ph = document.querySelector('.hero-img .ph');
   let ticking = false;
   function frame() {
     ticking = false;
     const max = document.documentElement.scrollHeight - window.innerHeight;
     if (bar) bar.style.transform = 'scaleX(' + (max > 0 ? Math.min(1, window.scrollY / max) : 0) + ')';
-    if (ph && !reduceMotion) ph.style.transform = 'translate3d(0,' + Math.round(window.scrollY * 0.12) + 'px,0)';
   }
   window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(frame); } }, { passive: true });
   frame();
 })();
-function countUp(el) {
-  const to = +el.dataset.to, fmt = el.dataset.fmt;
-  const show = v => el.textContent = fmt === 'rp' ? rp(v) : String(Math.round(v));
-  if (reduceMotion || !(to > 0)) return show(to);
-  const t0 = performance.now(), dur = 1100;
-  (function step(t) {
-    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
-    show(to * e);
-    if (k < 1) requestAnimationFrame(step); else show(to);
-  })(t0);
-}
-if ('IntersectionObserver' in window) {
-  const io = new IntersectionObserver(entries => entries.forEach(en => {
-    if (en.isIntersecting) { io.unobserve(en.target); countUp(en.target); }
-  }), { threshold: 0.6 });
-  document.querySelectorAll('.count').forEach(el => io.observe(el));
-}
 document.addEventListener('click', e => {
   const c = e.target.closest('[data-copy]');
   if (c) { e.preventDefault(); copyText(c.dataset.copy, 'Nomor rekening ' + c.dataset.copy + ' tersalin'); return; }

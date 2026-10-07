@@ -70,7 +70,7 @@ const stub = `<script>
 
 const dir = path.join(__dirname, '..', 'apps-script');
 const read = f => fs.readFileSync(path.join(dir, f), 'utf8');
-const index = read('Index.html');
+const index = read('Index.html').replace('<?= tabAwal ?>', 'bayar');
 const head = index.slice(index.indexOf('<head>') + 6, index.indexOf('</head>'))
   .replace(/<base[^>]*>\s*/, '').replace(/<meta charset[^>]*>\s*/, '').replace(/<meta name="viewport"[^>]*>\s*/, '')
   .replace(/<title>.*?<\/title>/, '<title>Kas Eunoia</title>')
