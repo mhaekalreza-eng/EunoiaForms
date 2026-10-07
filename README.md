@@ -47,13 +47,31 @@ tests/             mock Apps Script + tes server + preview UI lokal
 
 ### Pakai `clasp` (opsional)
 
-Butuh Node.js. Installer resmi Node di Mac/Windows biasanya minta password admin. Alternatifnya [nvm](https://github.com/nvm-sh/nvm) (Mac/Linux) atau `fnm`, yang bisa dipasang tanpa admin. Setelah Node ada, clasp tidak perlu diinstall global:
+`clasp` sendiri tidak butuh admin. Yang mungkin butuh admin adalah **Node.js**:
+
+| OS | Tanpa admin |
+|---|---|
+| Mac / Linux | [nvm](https://github.com/nvm-sh/nvm): `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh \| bash`, buka terminal baru, lalu `nvm install --lts` |
+| Windows | [fnm](https://github.com/Schniz/fnm), atau unduh Node versi **.zip** (bukan .msi), ekstrak ke folder user, dan tambahkan ke PATH user |
+
+Lalu, sekali saja:
+
+1. Nyalakan **Google Apps Script API** di https://script.google.com/home/usersettings.
+2. `npx @google/clasp login`, lalu login di browser dengan akun pemilik spreadsheet.
+3. Di editor Apps Script spreadsheet kas: **Project Settings → Script ID**, salin.
+4. Di folder repo, buat file `.clasp.json`:
+   ```json
+   { "scriptId": "<SCRIPT_ID>", "rootDir": "apps-script" }
+   ```
+   (Jangan pakai `clasp clone` ke folder `apps-script/`, karena akan menimpa `appsscript.json`.)
+
+Setiap kali kode berubah:
 
 ```bash
-npx @google/clasp login
-npx @google/clasp clone <SCRIPT_ID> --rootDir apps-script   # sekali, untuk membuat .clasp.json
-npx @google/clasp push
+npx @google/clasp push -f
 ```
+
+Deploy web app tetap paling gampang dari editor: **Deploy → Manage deployments → Edit → New version**.
 
 ## Import mutasi tiap bulan
 
